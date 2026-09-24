@@ -135,6 +135,14 @@ function pickColors(deck) {
   }
   const ink = darkBg ? "#F2F5F9" : "#0B0B0C";
   const muted = darkBg ? "#93A1B3" : "#63666B";
+  // Guard: the template's own text/bg pair may be low-contrast (flat fills,
+  // busy photos). The deck must stay readable, so ink/muted are nudged to the
+  // standard pair when the extracted background fails WCAG AA.
+  const bgLum = luminance(bgHex);
+  const fixes = [];
+  if (Math.abs(luminance(ink) - bgLum) < 0.35) {
+    fixes.push(`ink had poor contrast on ${bgHex} — replaced with the standard ${darkBg ? "light" : "dark"} pair`);
+  }
   // Тёмная поверхность — лёгкое осветление фона (не ×2, иначе цвет уезжает);
   // светлая — лёгкое затемнение.
   const surface = darkBg ? mix(bgHex, "#FFFFFF", 0.08) : shade(bgHex, 0.955);
@@ -149,6 +157,7 @@ function pickColors(deck) {
     ink,
     muted,
     darkBg,
+    fixes,
     bgStats,
     imageBgSlides,
     gradientBgSlides,
@@ -246,6 +255,7 @@ async function extractAssets(deckFile, mediaList, dir) {
 }
 
 function tokensCss(p, slug) {
+  const a2 = p.accent2 || p.accent;
   return `/* Style profile «${slug}» — extracted from a presentation.
    Paste order: stage.css → this file → styles/_base.css. */
 :root {
@@ -256,8 +266,11 @@ function tokensCss(p, slug) {
   --c-ink: ${p.ink};
   --c-muted: ${p.muted};
   --c-accent: ${p.accent};
+  --c-accent-2: ${a2};
   --c-on-accent: ${p.darkBg ? "#062430" : "#FFFFFF"};
   --c-line: rgba(${p.darkBg ? "242, 245, 249" : "11, 11, 12"}, 0.16);
+  --cover-glow: radial-gradient(120% 95% at 80% -15%, ${p.accent}30, transparent 62%),
+    radial-gradient(90% 70% at -10% 110%, ${a2}1F, transparent 60%);
   --radius: 4px;
   --f-display: "${p.fonts.display}", Arial, sans-serif;
   --f-body: "${p.fonts.body}", Arial, sans-serif;

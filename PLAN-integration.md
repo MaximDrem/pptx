@@ -1,6 +1,6 @@
-# PLAN-integration.md — rolling presentation v2 into desktop-ai-app
+# PLAN-integration.md — rolling presentation v3 into desktop-ai-app
 
-Goal: replace the current `presentation` skill (PptxGenJS/`deck.js`) with v2
+Goal: replace the current `presentation` skill (PptxGenJS/`deck.js`) with v3
 (HTML → native .pptx) and add a one-shot `--deck-render` mode to the app, which
 the skill helpers rely on.
 
@@ -12,19 +12,19 @@ BrowserWindow, which already exists in production for `--pptx-verify`.
 
 | From (this repository) | To (desktop-ai-app) |
 |---|---|
-| `presentation_v2/*` | `packages/desktop-electron/resources/defaults/skills/presentation/` (delete the folder and replace it entirely) |
-| `presentation_v2/.bundle-version` (= 39) | already inside the folder above |
-| `presentation_v2/app/deck-render.ts` | `src/main/deck-render.ts` |
+| `presentation_v3/*` | `packages/desktop-electron/resources/defaults/skills/presentation/` (delete the folder and replace it entirely) |
+| `presentation_v3/.bundle-version` (= 41) | already inside the folder above |
+| `presentation_v3/app/deck-render.ts` | `src/main/deck-render.ts` |
 | the detector from `deck-render.ts` (`isRunDeckRender`) | `src/main/deck-render-check.ts` (mirroring `pptx-verify-check.ts`) |
 
 ```bash
 # in the app repository:
 git rm -r packages/desktop-electron/resources/defaults/skills/presentation
-cp -r /path/to/presentation_v2 packages/desktop-electron/resources/defaults/skills/presentation
+cp -r /path/to/presentation_v3 packages/desktop-electron/resources/defaults/skills/presentation
 git add packages/desktop-electron/resources/defaults/skills/presentation
 ```
 
-Verify `.bundle-version` = `39` (the currently installed one = 35; when the
+Verify `.bundle-version` = `41` (the currently installed one = 35; when the
 number increases, `seed-defaults.ts` deletes the user's folder and re-seeds it
 entirely — the old skill rolls out by itself).
 
@@ -96,7 +96,7 @@ as in `--pptx-verify`.
 
 `presentation` is already in `versionStampedSkills` (the line exists in the
 current version) — no code change is needed, only the new
-`.bundle-version = 39`. If the line is actually missing, add it following the
+`.bundle-version = 41`. If the line is actually missing, add it following the
 neighboring skills.
 
 ### 2.5 Packaging
@@ -120,11 +120,11 @@ dependencies.
 
 - `resources/defaults/skills/presentation/helpers/*` of the old formats
   (`deck.js` runners, template/save-template, text/layout analyzers, built
-  pptxgenjs bundles) — fully replaced by the v2 content.
+  pptxgenjs bundles) — fully replaced by the v3 content.
 - old vendor build scripts (`vendor-pptxgenjs.ts`, `vendor-automizer.ts`,
   `vendor-skill-extras.ts` + their `*-entry.cjs`) — only after `rg` confirms
   nothing else consumes them (package.json scripts, CI configs, other skills).
-  v2 vendors dom-to-pptx/jszip inside the skill folder; the old bundles stay
+  v3 vendors dom-to-pptx/jszip inside the skill folder; the old bundles stay
   recoverable from git history for a rollback.
 - `test/pptxgenjs-helpers.test.ts` and `scripts/smoke-pptxgenjs-skill.ts` —
   they require the removed `helpers/text.cjs` and fail at import; remove their
@@ -143,12 +143,27 @@ dependencies.
 | A deck with endless JS (the navigator) | watchdog + lint cuts external scripts; `timed out` in stdout |
 | Raster effects (blur/shadows) in the .pptx | expected: complex effects become a picture; text outside effects stays native (verify in S1) |
 
-## 6. Deliberately out of scope for v2
+## 6. Deliberately out of scope for v3
 
 - editing an existing .pptx in place (edit-in-place on a company master) — do
-  it as a separate skill on top of `read-pptx.cjs` if needed; v2 rebuilds the
+  it as a separate skill on top of `read-pptx.cjs` if needed; v3 rebuilds the
   deck in HTML;
 - EMF/WMF→SVG conversion when reading (no offline converter; the files are
   extracted and listed);
 - native PowerPoint charts: charts are drawn in SVG/CSS and exported as vector
   shapes (editable as shapes).
+
+## 7. v3 addition: `--pptx-verify` is a dependency of shots.cjs
+
+`helpers/shots.cjs` renders template slides to PNG for vision-based style
+copying via the app's existing one-shot mode:
+
+```js
+spawn(GIGATOOL_NODE, [GIGATOOL_APP_PATH?, "--pptx-verify", <abs.pptx>, "--out-dir", <dir>])
+```
+
+This mode already exists in production (the v1 skill used it); the integration
+must keep it available in parallel with `--deck-render`. If it is ever
+removed, shots.cjs degrades to the `read-pptx.cjs --extract-media` fallback
+(exit 2, fallback instructions printed) — the skill keeps working, only the
+vision quality drops.

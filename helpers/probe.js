@@ -429,6 +429,10 @@
 
     const slideRect = slide.getBoundingClientRect();
 
+    // Decorative layers (`.decor`, `.cover-art`) may intentionally bleed past
+    // the slide edges and must not count as content or trigger geometry checks.
+    const isDecor = (el) => !!(el.closest && el.closest(".decor, .cover-art"));
+
     // A display:none (or zero-sized) slide is invisible to the export engine:
     // it is silently dropped from the .pptx (real incident: 8 of 10 slides
     // vanished). Slides must be hidden with .active only.
@@ -450,6 +454,7 @@
 
     const outOfBounds = [];
     for (const el of descendants) {
+      if (isDecor(el)) continue;
       const rect = el.getBoundingClientRect();
       if (rect.width <= 0 && rect.height <= 0) continue;
       const fullSlide = isFullSlide(rect, slideRect);
@@ -563,7 +568,7 @@
     // Kicker, footer, soft icon badges and icon strokes do not count.
     if ((slide.dataset.role || "content") === "content") {
       const accentSel =
-        ".card.accent, .node.accent, .cell.accent, .step.accent, .pill.accent, .icon-badge:not(.soft), .accent-text, .fill, .area, .series, .point, .seg, .table .hl";
+        ".card.accent, .node.accent, .cell.accent, .step.accent, .pill.accent, .icon-badge:not(.soft), .accent-text, .fill, .area, .series, .point, .seg, .table .hl, .timeline .dot, .cover-art";
       if (!slide.querySelector(accentSel)) {
         push("no-accent", "no emphasis accent on this slide — highlight the key card, step, number or table row");
       }
@@ -632,6 +637,7 @@
     const emptyLimit = 0.33;
     const contentRects = [];
     for (const el of descendants) {
+      if (isDecor(el)) continue;
       const rect = el.getBoundingClientRect();
       if (rect.width <= 2 || rect.height <= 2) continue;
       if (inChrome(el)) continue;
@@ -661,6 +667,7 @@
     const hasText = readText(slide).length > 0;
     let hasContent = false;
     for (const el of descendants) {
+      if (isDecor(el)) continue;
       const rect = el.getBoundingClientRect();
       if (rect.width <= 2 || rect.height <= 2) continue;
       if (isFullSlide(rect, slideRect)) continue;

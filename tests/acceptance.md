@@ -15,6 +15,7 @@ node tests/unit/validate-checks.test.cjs    # new artifact checks
 node tests/unit/render-report.test.cjs      # report/artifacts after temp cleanup, exit 4
 node tests/unit/lint-deck.test.cjs          # location, //host/file:, no bypass
 node tests/unit/expand-styles.test.cjs      # managed style block expansion
+node tests/unit/review.test.cjs             # self-reflection package (PNG paths, probe, checklist)
 ```
 
 ## L1 — render with real Chromium (test harness)
@@ -135,6 +136,24 @@ Precondition: the integration from `PLAN-integration.md` is done and
   A deck with `<style data-presentation-style="signal-night"></style>` gets
   the canonical CSS installed by `index.cjs` before lint/render; re-running
   refreshes it without touching deck-authored `<style>` blocks.
+- **S13. Template vision (v3)**
+  `... shots.cjs <template.pptx> --out-dir /tmp/tpl-shots --keep` → one PNG per
+  slide + a digest line (`slide 01: «…» bg=image(image41.png)@full-slide-image`);
+  the agent reads the images before extracting a style. Without
+  `$GIGATOOL_NODE` the helper exits 2 and prints the
+  `read-pptx.cjs --extract-media` fallback.
+- **S14. Template-copy guards (v3)**
+  A deck whose background is a transparent/decor picture → `validate` error
+  `decor-as-background`, exit 1 (unit-covered in
+  `tests/unit/validate-checks.test.cjs`, case 13); a 6-slide text-only deck →
+  warning `visual-scarcity` (case 14).
+- **S15. Self-reflection driver (v3)**
+  `... review.cjs deck.html --out-dir /tmp/deck-check` → prints the slide PNG
+  paths to look at, the probe issues, the validate section (or the
+  `index.cjs --pptx` hint when there is no .pptx) and the checklist;
+  `--reference <template.pptx>` adds reference shots (or the
+  `--extract-media` fallback). A bleeding `.decor`/`.cover-art` layer must not
+  produce probe issues (`decor-body` fixture).
 
 ## Acceptance criteria (from the original task)
 

@@ -1,7 +1,7 @@
 ---
 name: presentation
-description: Use this skill whenever the user asks for a presentation, deck, slides, a .pptx file, or «сделай презентацию», «сверстай слайды», «презентация по…», «сделай в этом стиле» (приложена презентация-образец), «переделай презентацию», «поправь слайды». Builds a deck as editable HTML (deck.html) on a fixed 1280×720 stage and exports it to a REAL .pptx: native text, shapes, embedded fonts, speaker notes. Reads an attached .pptx completely (layers, groups, pictures/SVG, tables, charts, styles) and can copy its style. No npm/internet — everything ships inside the skill.
-previewDescription: Презентации (HTML → native PPTX)
+description: Use this skill whenever the user asks for a presentation, deck, slides, a .pptx file, or «сделай презентацию», «сверстай слайды», «презентация по…», «сделай в этом стиле» (приложена презентация-образец), «переделай презентацию», «поправь слайды». Builds a deck as editable HTML (deck.html) on a fixed 1280×720 stage and exports it to a REAL .pptx native text, shapes, embedded fonts, speaker notes. Reads an attached .pptx completely (layers, groups, pictures/SVG, tables, charts, styles), shows its slides as images for visual copying, and can copy its style. No npm/internet — everything ships inside the skill.
+previewDescription: Презентации (HTML → native PPTX + vision)
 ---
 
 You build presentations as an **HTML deck** (`deck.html`) on a fixed 1280×720
@@ -25,7 +25,7 @@ Each of these has already broken a real deck. They are not style advice.
    and the `.pptx` lands next to it. Never build the deck in `/tmp` and never
    create your own folders for it (e.g. `/tmp/folder`) — the user will not see
    the result, and `lint-deck` fails a deck that lives in temp. Temp is only
-   for drafts and extracted media.
+   for drafts, shots and extracted media.
 3. **Never `display:none` a slide.**
    Slides are hidden with `.active` (visibility/opacity) only. The export
    engine silently drops `display:none` subtrees: a real deck lost 8 of its 10
@@ -45,7 +45,13 @@ Each of these has already broken a real deck. They are not style advice.
    layout issues (exit 4, no `.pptx` is produced). `validate.cjs` errors block
    delivery. Every content slide must have `elements > 0` and `coverage > 0` in
    `inventory.json`. There is no "deliver anyway".
-7. **Do not change `stage.css`** — the 1280×720 stage is the export contract.
+7. **Look before you copy, look before you deliver (vision).**
+   When a template .pptx is attached, render its slides with
+   `helpers/shots.cjs` and READ the images before extracting a style. The
+   render→look→fix→repeat loop is driven by `helpers/review.cjs`; READ its
+   printed PNGs at every iteration and once more after the export. If you
+   cannot view images, say so and rely on `validate.cjs` + the text digest.
+8. **Do not change `stage.css`** — the 1280×720 stage is the export contract.
    No emoji, no external URLs/CDNs, no font shrinking to hide overflow
    (cut the text or switch the pattern), never delete `deck.html`.
 
@@ -57,8 +63,8 @@ Each of these has already broken a real deck. They are not style advice.
 - No `deck.js`/`deck.ts`/`.py`/build scripts in the result: HTML is the source.
 - Reply to the user with absolute paths to the .pptx and .html plus a one-line
   summary.
-- Drafts, render folders and extracted media go to temp only, never into the
-  project; the deck itself never lives in temp.
+- Drafts, render folders, shots and extracted media go to temp only, never
+  into the project; the deck itself never lives in temp.
 
 ## Command (the only allowed runtime)
 
@@ -66,9 +72,9 @@ Each of these has already broken a real deck. They are not style advice.
 ELECTRON_RUN_AS_NODE=1 "$GIGATOOL_NODE" "$HOME/.wsc/config/skills/presentation/helpers/index.cjs" deck.html --pptx
 ```
 
-Run it from the working folder (or pass the absolute path to the deck). It
-does: styles expansion → asset inlining → lint → real render (PNG + reports) →
-export. If `$GIGATOOL_NODE` is not set, say the deck cannot be built outside
+All helpers run the same way (`ELECTRON_RUN_AS_NODE=1 "$GIGATOOL_NODE" …
+helpers/<name>.cjs …`). There is no bare `node` and no `python` — do not even
+try them. If `$GIGATOOL_NODE` is not set, say the deck cannot be built outside
 the app and stop.
 
 Full helper list, report formats and diagnostics: `reference.md`.
@@ -79,9 +85,9 @@ Full helper list, report formats and diagnostics: `reference.md`.
 
 | Request | Mode |
 |---|---|
-| "make a presentation about X" | new deck (steps 1–6) |
-| "make it in the style of this deck" (a .pptx attached) | copy style (step 1B), then 2–6 |
-| "rework/improve this presentation" (a .pptx attached) | read it (step 1C), then 2–6 |
+| "make a presentation about X" | new deck (steps 1A, 2–7) |
+| "make it in the style of this deck" (a .pptx attached) | **vision style copy** (step 1B), then 2–7 |
+| "rework/improve this presentation" (a .pptx attached) | read it (step 1C), then 2–7 |
 | "in the style of <saved>" | profile from `~/.wsc/config/styles/` |
 
 Before working, ask the user only what really changes the deck: topic/goal,
@@ -89,53 +95,65 @@ audience, approximate length, must-have facts/numbers, deadline (if they ask
 for "15 minutes" — that's 8–10 slides). Do not start laying out before you
 understand the goal and the length.
 
-### 1. Assemble the style
+### 1A. Pick a built-in style
 
-**A. Built-in styles** — `styles/index.json`: `grid-paper` (product/analytics),
-`ink-press` (reports/stories), `signal-night` (strategy/pitch). Pick by content
-type without asking; if the user named a style, use it. The style is requested
-in the marker, the builder installs the tokens:
+`styles/index.json`: `grid-paper` (product/analytics), `ink-press`
+(reports/stories), `signal-night` (strategy/pitch). Pick by content type
+without asking; if the user named a style, use it:
 
 ```html
 <style data-presentation-style="signal-night"></style>
 ```
 
-**B. Style of an attached deck:**
+### 1B. Copy the style of an attached deck (with your eyes)
+
+Text parsing alone is NOT enough — it produced decks with flat blue slides and
+a decorative cat stretched as a background. The workflow:
 
 ```bash
-... style-profile.cjs "<path to attached .pptx>" --name "Style name"
+# 1) See the template first: per-slide PNGs + a text digest
+... shots.cjs "<attached.pptx>" --out-dir /tmp/tpl-shots --keep
+
+# 2) Extract tokens/assets + the media inventory
+... style-profile.cjs "<attached.pptx>" --name "Style name"
 ```
 
-It writes `~/.wsc/config/styles/<slug>/`; reference it in the marker as
-`<style data-presentation-style="profile:<slug>"></style>`. The profile also
-has `assets/` (backgrounds/decor) and `profile.json` (principles + evidence).
-Replace a proprietary font from the sample with the nearest vendored face and
-say so in the reply.
+Then, **in this order**:
 
-**C. Someone else's .pptx to rework** — read it with `read-pptx.cjs` (below),
-then rebuild in HTML; take the style from a profile built from the same file.
+1. READ every `/tmp/tpl-shots/slide-NN.png` (vision). For each slide note:
+   role (cover/section/content/closing), background (flat color? photo?
+   gradient?), where the logo sits, what is decor vs content. This is the
+   ground truth — the parser's roles are hints, your eyes are the verdict.
+2. From the shots pick the **background assets**: full-slide, dark or calm
+   images only. A transparent PNG or a small/edge element is DECOR — it never
+   becomes a slide background (the validator errors `decor-as-background`;
+   real incident: the template's cat decor became the final slide's
+   background).
+3. Note the palette by looking: dominant color, accent, whether the deck is
+   dark or light. Compare with the extracted `tokens.css`; if they disagree,
+   trust what you SEE and fix the tokens (bg/ink/accent) by hand.
+4. Build the deck with `data-presentation-style="profile:<slug>"`, copy the
+   chosen assets next to `deck.html` (`images/…`), reference them as
+   `<img>`/backgrounds. Keep the template's dark/light decision on EVERY
+   slide — do not switch some slides to a flat color "for variety" (that is
+   how the blue slides happened).
+5. Verify against the reference: put a template shot next to your render of
+   the same kind of slide. If they feel like different decks, fix tokens or
+   backgrounds before delivering.
 
-### 1+. Reading a .pptx
+### 1C. Rework someone else's .pptx
 
 ```bash
-... read-pptx.cjs deck.pptx                 # summary: slides, themes, media, fonts
-... read-pptx.cjs deck.pptx --outline       # texts only (outline)
-... read-pptx.cjs deck.pptx --slide 7       # one slide: all elements and styles
+... shots.cjs deck.pptx --out-dir /tmp/tpl-shots --keep   # see it
+... read-pptx.cjs deck.pptx --outline                     # texts
+... read-pptx.cjs deck.pptx --slide 7                     # one slide in full
 ... read-pptx.cjs deck.pptx --extract-media /tmp/deck-media
 ```
 
-Read EVERY slide you need one by one (`--slide N`) before rebuilding:
-z-order, groups, px coordinates (1:1 with HTML), SVG vectors, tables, charts,
-notes, and for every text — font, size, color with the inheritance source
-(layout/master/default) and the background under it (`on=`). Never invent the
-content of an attached file: if the report does not show it, say you did not
-find it.
-
-For style reuse, media carry automatic roles and stats: `[background]`
-(dark/wide → good as a background), `[logo]`, `[decor]`, `[icon]`, `[photo]`,
-`[graphic]`, plus `avgColor/dark/saturated/hasAlpha`. Choose background/decor by
-role and stats — no eyes needed; take meaningful icons from Lucide
-(`icons.cjs --get`), meaningful pictures from chat generation.
+Read EVERY slide you need one by one (`--slide N`) plus its shot: z-order,
+groups, px coordinates (1:1 with HTML), SVG vectors, tables, charts, notes,
+per-text font/size/color with the inheritance source. Never invent the content
+of an attached file: if the report does not show it, say you did not find it.
 
 ### 2. Plan the structure
 
@@ -145,10 +163,9 @@ is two slides. Never duplicate texts between slides.
 
 ### 3. Write deck.html
 
-Use the minimal skeleton below (the managed style line + your slides). Open
+Use the minimal skeleton (managed style line + your slides). Open
 `examples/example-deck.html` as a markup reference — but do NOT copy it
-wholesale: its working copy carries expanded CSS (hundreds of KB) that you
-must not paste. Your deck stays small: styles come from the builder.
+wholesale: its working copy carries expanded CSS that you must not paste.
 
 ```html
 <!doctype html>
@@ -161,93 +178,109 @@ must not paste. Your deck stays small: styles come from the builder.
 </head>
 <body>
 <div class="deck-viewport"><div class="deck-stage" id="deck-stage">
-  <section class="slide cover" data-role="cover">…</section>
+  <section class="slide cover" data-role="cover">
+    <div class="cover-art" aria-hidden="true"></div>
+    …slide-pad…
+  </section>
   …
 </div></div>
 <div class="deck-controls">…</div>
-<script>/* navigator: --fit, arrows, hash. Copy from examples/example-deck.html */</script>
+<script>/* navigator: copy from examples/example-deck.html */</script>
 </body>
 </html>
 ```
 
-Rules:
+Markup rules:
 
 - slides and blocks come from `patterns.md`; do not invent a new grid until you
   have tried the existing ones;
 - **one-box rule**: text inside a colored box is written as runs directly in
   the box (`.t-title/.t-body/.t-cap`, `<b>`, `<br>`) with nothing else in the
-  box, so the .pptx has one editable shape; icons/badges go next to it via
-  `.card-stack`. **Separate every row boundary with `<br>`** — without it the
-  exporter merges the runs into one paragraph and PowerPoint shows the title
-  and body on one line (probe warns `missing-br`);
+  box; icons/badges go next to it via `.card-stack`. **Separate every row
+  boundary with `<br>`** — without it the exporter merges the runs into one
+  paragraph (probe blocks `missing-br`);
 - **accent budget**: every content slide carries at least one emphasis accent
-  that shows the eye where to look (accent card/node/cell/step, accent number,
-  chart bar/area, highlighted table row). More than one accent is fine when the
-  layout expresses real hierarchy; do not accent everything equally. Kicker,
-  footer, soft icon badges and icon strokes do not count as emphasis (probe
+  (accent card/node/cell/step, accent number, chart bar, highlighted table
+  row). More than one is fine when the layout expresses real hierarchy; do not
+  accent everything equally. Kicker/footer/soft badges do not count (probe
   warns `no-accent`);
-- **box fill**: do not leave tall boxes half-empty — two lines of text in a
-  260px box reads as a defect (probe warns `sparse-box`); add substance or
-  shorten the box;
+- **visual anchor**: every content slide has something to look at — a Lucide
+  icon, a chart, a photo or a big number. A deck of text-only cards reads as
+  empty even when the text is there (probe: `sparse-box`, validate:
+  `visual-scarcity`);
+- **box fill**: do not leave tall boxes half-empty (probe warns `sparse-box`);
 - colors/fonts/radii only via tokens `var(--…)`; hex in markup is forbidden;
 - charts — from `charts.md` (SVG/CSS, no libraries), numbers must be honest;
-- speaker notes — `<template data-pptx-notes>…</template>` inside the slide;
-- icons — `node helpers/icons.cjs --get <name>` (Lucide, not emoji);
-- images — local files (`<img src="images/...">`), not URLs; every image needs
-  an `alt` (empty `alt=""` for decoration); generate pictures ONLY with a chat
-  tool (e.g. `gigachat_image`) before assembling;
-- no external links/fonts/scripts (except our navigator) — the deck is offline;
-- write 8–14 slides in one pass; more — in two passes (skeleton + first slides,
-  rebuild, then the rest).
+- covers/sections/closings get `<div class="cover-art">` (the style's glow)
+  plus at least one `<div class="decor …">` element (`decor-dots`/`decor-ring`/
+  `decor-blob`, positions `pos-tr/pos-bl/pos-tl`; they may bleed off-slide and
+  are skipped by the probe) — this is the cheap trick that makes covers look
+  designed, not typed;
+- speaker notes — `<template data-pptx-notes>…</template>` inside EVERY slide;
+- **icons**: copy ready `<svg class="icon">…</svg>` lines from
+  `styles/_base/icons.md` (one line per name). There is no `node` binary and
+  no emoji — never draw your own paths;
+- images — local files (`<img src="images/...">` with `alt`), generated ONLY
+  with a chat tool (e.g. `gigachat_image`) before assembling; template media —
+  copied next to the deck and verified by looking at them;
+- no external links/fonts/scripts (except our navigator);
+- write 8–14 slides in one pass; more — in two passes.
 
 ### 4. Render loop (mandatory gate)
 
 ```bash
-... index.cjs deck.html          # styles + assets + lint + render; no pptx
+... review.cjs deck.html --out-dir /tmp/deck-check
 ```
 
-Read the stdout lines (`slide N: TEXT-CLIPPED: …`) and the diagnostics table in
-`reference.md`, fix the HTML, repeat. Goal: `render: clean`. Typical beginner
-mistakes: fixed heights on text blocks, absolute positions, empty bottom of a
-slide, hex colors outside tokens, runs in a box not separated by `<br>`,
-`display:none` on slides.
+`review.cjs` renders the deck, prints every `slide-NN.png` to look at, lists
+the probe issues, runs the artifact validator if a .pptx already exists, and
+prints the review checklist. The loop is:
 
-While the render is not clean, do not build the .pptx: the tool will refuse
-anyway (exit 4) and the user would get the same defect.
+1. **review** — run the command;
+2. **look** — READ every printed PNG (vision). For a 10-slide deck that is 10
+   images; do not skip dense slides or the cover/closing;
+3. **fix** — edit `deck.html` per the checklist and the probe lines;
+4. **repeat** until `render: clean` AND your eyes agree.
 
-### 5. Export and self-reflection (mandatory loop)
+Fix probe blockers first (`TEXT-CLIPPED`, `OUT-OF-BOUNDS`, `TEXT-OVERLAP`,
+`LOW-CONTRAST`, `BLANK`, `BROKEN-IMAGE`, `HIDDEN-SLIDE`, `MISSING-BR`), then
+the taste issues (`EMPTY-REGION`, `SPARSE-BOX`, `NO-ACCENT`, `TIGHT-GAP`).
+While the render is not clean, do not build the .pptx: the tool refuses
+anyway (exit 4).
+
+If you cannot view images in this environment, say so explicitly and rely on
+the probe lines + `inventory.json` (`coverage` > 0 on every content slide).
+
+### 5. Export and validate
 
 ```bash
 ... index.cjs deck.html --pptx     # build + line-spacing post-processing
-... validate.cjs deck.html         # report: HTML checks + .pptx artifact
+... validate.cjs deck.html         # HTML checks + .pptx artifact
 ```
 
-`index.cjs deck.html --pptx` puts `<slug>.pptx` **next to deck.html** (and
-prints `artifact: <path>`); `--out-dir` is only for special cases and takes the
-artifact away from the user's folder. The export is refused (exit 4) while
-blocking issues exist: clipped/overlapping/low-contrast text, blank or
-`display:none` slides, broken images, rows in a box not separated by `<br>`.
-Fix them and re-run — the .pptx simply does not exist until then.
+The .pptx lands next to deck.html (`artifact: <path>`). The export is refused
+(exit 4) while blocking issues exist. `validate.cjs` checks the artifact
+itself (empty placeholders/slides, split boxes, WCAG contrast, font sizes,
+typography, placeholders, stage size, embedded fonts, notes,
+`decor-as-background`, `visual-scarcity` …). Loop until `validate: clean`;
+warnings must at least be mentioned to the user.
 
-`validate.cjs` re-renders the deck and additionally checks the .pptx itself
-(empty placeholders, split "backdrop + separate textbox" pairs, WCAG AA run
-contrast, minimum font size, hierarchy, fullness, density, exact line spacing,
-placeholder texts, Russian typography, stage size, embedded fonts,
-`<a:normAutofit>`, notes, empty slides and more). Work in a loop: fix →
-`validate` → fix until you see `validate: clean` (errors block delivery;
-warnings must at least be mentioned to the user).
+### 6. Visual self-review, then deliver (vision)
 
-The result next to `deck.html` is `<slug>.pptx`: native text, shapes, embedded
-TTFs, notes. SVG charts become a vector group ("Convert to Shapes" works). If
-the report has `FONT NOT LOADED`, the validator raises a `FONT NOT LOADED`
-error: replace the font first, then deliver.
+The last gate — look at the EXPORTED deck, not the HTML:
 
-### 6. Deliver
+```bash
+... review.cjs deck.html --out-dir /tmp/deck-final [--reference "<template.pptx>"]
+```
 
-- short summary: what the deck is, number of slides, style, paths;
-- ask the user to verify a couple of facts/numbers if the data is estimated;
-- on "fix slide N" — edit `deck.html`, run `index.cjs --pptx` again,
-  overwrite the .pptx (same name).
+READ the printed PNGs (in template mode also the reference shots) and answer
+the checklist honestly. Minimum: cover, one dense content slide, one light
+slide, closing. Compare with the reference shot of the same slide type. If
+something is off — fix the HTML and repeat steps 4–6. If you cannot view
+images, state it and deliver on `validate: clean` alone.
+
+Delivery: short summary (what/how many slides/style/paths), ask the user to
+verify estimated numbers, and on "fix slide N" — edit `deck.html`, rebuild.
 
 ## Hard bans
 
@@ -256,12 +289,12 @@ error: replace the font first, then deliver.
 - no emoji, external URLs, CDNs;
 - no `display:none` on slides;
 - never change `stage.css`;
-- do not "fix" overflow by aggressively shrinking the font — first cut the
-  text or switch the pattern;
-- do not delete `deck.html` after export — it is the source for edits.
+- never use decor/logo media as a slide background;
+- do not "fix" overflow by shrinking the font;
+- do not delete `deck.html` after export.
 
 ## Files
 
 `patterns.md` — slide patterns · `charts.md` — charts · `reference.md` —
-helpers/formats/diagnostics · `examples/example-deck.html` — reference deck
-(open it when in doubt about the skeleton).
+helpers/formats/diagnostics · `styles/_base/icons.md` — paste-ready Lucide
+icons · `examples/example-deck.html` — reference deck.

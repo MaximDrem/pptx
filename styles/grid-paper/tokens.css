@@ -1,14 +1,17 @@
 /* Grid Paper — tokens. Order: stage.css → this file → base.css. */
 :root {
-  --stage-bg: #101216;
-  --slide-bg: #ffffff;
-  --c-bg: #ffffff;
-  --c-surface: #f3f4f6;
-  --c-ink: #0b0b0c;
-  --c-muted: #63666b;
-  --c-accent: #2447f0;
+  --stage-bg: #e8e6de;
+  --slide-bg: #fafaf6;
+  --c-bg: #fafaf6;
+  --c-surface: #ffffff;
+  --c-ink: #131519;
+  --c-muted: #57606e;
+  --c-accent: #2e54f6;
+  --c-accent-2: #0e9b6e;
   --c-on-accent: #ffffff;
-  --c-line: rgba(11, 11, 12, 0.16);
+  --c-line: rgba(19, 21, 25, 0.12);
+  --cover-glow: radial-gradient(120% 95% at 82% -15%, rgba(46, 84, 246, 0.16), transparent 62%),
+    radial-gradient(90% 70% at -8% 108%, rgba(14, 155, 110, 0.1), transparent 58%);
   --radius: 2px;
   --f-display: "Unbounded", Arial, sans-serif;
   --f-body: "Inter", Arial, sans-serif;

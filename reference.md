@@ -168,6 +168,7 @@ Two levels in one report:
 | Check | Catches |
 |---|---|
 | `empty-slide` | the slide has no elements at all in the .pptx — it fell out of the export (check `display:none` / `.active`) |
+| `decor-as-background` | a transparent/decor/logo picture is stretched as a full-slide background (real incident: the template's cat decor became the final slide's background) | backgrounds come from `[background]`-role media or a token; decor stays decor |
 | `empty-placeholder` | a filled placeholder with no text or content |
 | `split-box` | "backdrop + separate textbox" (text not written as runs in the box) |
 | `contrast` | run contrast: error < 3.0 (WCAG AA large text), warning < 4.5 (WCAG AA body); inheritance-aware and blending translucent fills |
@@ -186,6 +187,7 @@ Two levels in one report:
 | `slide-count`, `notes`, `image-coverage`, `repeated-words` | too few slides; notes; no pictures; word repetition |
 | `pptx-missing` | `validate.cjs deck.html` found no .pptx next to the deck | run `index.cjs deck.html --pptx`; the export is blocked until the render is clean |
 | `slide-count-mismatch` | the render saw more slides than the .pptx has — slides were dropped on export | find `display:none` / hidden slides, use `.active` |
+| `visual-scarcity` | the deck has almost no graphics (<3 pictures/SVG across ≥6 slides) | add Lucide icons, charts or photos |
 | `tight-line-spacing` | exact line spacing (the cause of overlap in PowerPoint; fixed by `pptx-post.cjs`) |
 
 Output: `validate: N error(s), M warning(s)` + `validate.json`; exit 1 when
@@ -323,10 +325,50 @@ charts are snippets from `charts.md`. No libraries in the deck.
 
 - vendored faces: `fonts/manifest.json` (Inter 400/600/800, Source Serif 4 600,
   Unbounded 700, JetBrains Mono 400) — woff2 for rendering, ttf for embedding;
-- icons: `node helpers/icons.cjs --list`, `--get <name>` — ready-made
-  `<svg class="icon">` lines, catalog `styles/_base/icons.md`;
+- icons: **copy ready `<svg class="icon">…</svg>` lines from
+  `styles/_base/icons.md`** (one line per name, 105 icons). There is no bare
+  `node` binary in the app environment — do not try `node helpers/icons.cjs`;
+  if you must regenerate the catalog:
+  `ELECTRON_RUN_AS_NODE=1 "$GIGATOOL_NODE" …/helpers/icons.cjs --get <name>`;
 - a font missing from `fonts/` → use the nearest vendored face and say so;
   `FONT NOT LOADED` in the report is an error, not a detail.
+
+## shots.cjs — see a .pptx with your own eyes (vision)
+
+```bash
+... shots.cjs deck.pptx --out-dir /tmp/tpl-shots --keep
+```
+
+Renders every slide of ANY .pptx to `slide-NN.png` via the app's production
+preview renderer (`--pptx-verify`) and prints the paths plus a one-line text
+digest per slide (title + background source). Use it to:
+
+- **look at an attached template before copying its style** — classify slides
+  and elements with your eyes; parser roles are hints, your verdict is the
+  truth;
+- look at the deck you are reworking;
+- visually compare your render with the reference before delivery.
+
+If the renderer is unavailable, the helper prints a fallback
+(`read-pptx.cjs --extract-media` + looking at the extracted pictures) and
+exits 2.
+
+## review.cjs — the self-reflection driver (render → look → fix)
+
+```bash
+... review.cjs deck.html --out-dir /tmp/deck-check [--reference <template.pptx>] [--no-validate]
+```
+
+One command for the whole loop: renders the deck, prints the paths of every
+`slide-NN.png` to LOOK at, lists probe issues, runs `validate.cjs` on the
+existing `.pptx` (skipped with `--no-validate`), optionally renders reference
+shots of a template, and prints the review checklist (style consistency,
+visual anchors, decor, template similarity, AI-slop signals).
+
+The loop is: `review` → READ the PNGs (vision) → fix `deck.html` → `review`
+again, until `render: clean` AND the eyes agree; then `index.cjs --pptx` and
+`validate.cjs`. The export is blocked (exit 4) while blocking issues remain,
+so an unreviewed dirty deck cannot slip through.
 
 ## Diagnostics
 
@@ -368,6 +410,8 @@ presentation/            ← this folder (installed as ~/.wsc/config/skills/pres
 │   ├── lint-deck.cjs    ├── assets.cjs   ├── render.cjs
 │   ├── validate.cjs     ├── pptx-post.cjs ├── refs.cjs
 │   ├── read-pptx.cjs    ├── style-profile.cjs ├── icons.cjs
+│   ├── shots.cjs        ← .pptx → per-slide PNGs for vision
+│   ├── review.cjs       ← render → look → fix loop driver (vision)
 │   ├── probe.js         ← injected into the render window
 │   └── lib/xml.cjs, lib/pptx.cjs
 ├── vendor/              ← jszip 3.10.1, dom-to-pptx 2.1.2 (MIT), licenses

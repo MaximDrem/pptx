@@ -320,6 +320,62 @@
 .slide.section .slide-pad { justify-content: center; }
 .slide.section .headline { color: var(--c-accent); }
 
+/* Cover/section backdrop: a soft two-color glow from the style tokens.
+   Put it FIRST inside the slide, before .slide-pad. */
+.cover-art {
+  position: absolute;
+  inset: 0;
+  background: var(--cover-glow, none);
+  pointer-events: none;
+}
+
+/* ---------------------------------------------------------------- decor
+   Decorative layers for covers/sections/closings. They may bleed past the
+   slide edges: the probe skips `.decor`/`.cover-art` entirely (no
+   out-of-bounds, no content counting). Never put text inside a .decor. */
+.decor { position: absolute; pointer-events: none; }
+.decor.pos-tr { top: -140px; right: -120px; }
+.decor.pos-bl { bottom: -160px; left: -120px; }
+.decor.pos-tl { top: -120px; left: -140px; }
+.decor-blob {
+  width: 520px;
+  height: 520px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, var(--c-accent, #8aa) 0%, transparent 72%);
+  opacity: 0.16;
+}
+.decor-blob.alt { background: radial-gradient(closest-side, var(--c-accent-2, var(--c-accent, #8aa)) 0%, transparent 72%); opacity: 0.14; }
+.decor-ring { width: 430px; height: 430px; border-radius: 50%; border: 2px solid var(--c-line); }
+.decor-dots {
+  width: 280px;
+  height: 280px;
+  background-image: radial-gradient(currentColor 1.5px, transparent 1.6px);
+  background-size: 22px 22px;
+  color: var(--c-line);
+}
+
+/* -------------------------------------------------------------- timeline */
+
+.timeline { display: flex; flex-direction: column; }
+.timeline .tl { display: grid; grid-template-columns: 96px 24px 1fr; gap: 14px; }
+.timeline .tl .t { font: 600 13px var(--f-body); color: var(--c-muted); text-align: right; padding-top: 2px; }
+.timeline .tl .rail { position: relative; }
+.timeline .tl .rail::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 18px;
+  bottom: -8px;
+  width: 2px;
+  background: var(--c-line);
+  transform: translateX(-50%);
+}
+.timeline .tl:last-child .rail::before { display: none; }
+.timeline .tl .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--c-accent); margin: 4px auto 0; position: relative; z-index: 1; }
+.timeline .tl .body { padding-bottom: 16px; min-width: 0; }
+.timeline .tl .body h3 { font-size: 15px; font-weight: 600; margin: 0 0 9px; color: var(--c-ink); }
+.timeline .tl .body p { font-size: 13.5px; line-height: 1.4; color: var(--c-muted); margin: 0; }
+
 /* --------------------------------------------------------------- charts
    SVG snippets live in charts.md. Geometry is authored (honest numbers),
    no libraries: the exporter turns SVG into native PowerPoint shapes. */

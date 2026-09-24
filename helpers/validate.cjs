@@ -197,6 +197,7 @@ function checkDeck(deck) {
   };
 
   const isFullSlideBox = (b) => b.w >= deck.slideSize.emu.cx * 0.9 && b.h >= deck.slideSize.emu.cy * 0.9;
+  const mediaByName = new Map((deck.media || []).map((m) => [m.name, m]));
   for (const slide of deck.slides) {
     const flat = flatten(slide.elements);
     const shapeBoxes = flat.filter((el) => box(el));
@@ -237,6 +238,30 @@ function checkDeck(deck) {
         check: "empty-placeholder",
         detail: `«${el.name || el.id}» — залитая плашка без текста и содержимого (${emuToPx(b.w)}×${emuToPx(b.h)}px)`,
       });
+    }
+
+    // --- 1b. Декор как фон: прозрачная картинка или элемент с ролью decor/logo,
+    //     растянутый на весь слайд (реальный инцидент: декоративный кот стал
+    //     фоном финального слайда). Фон — это [background]-медиа или токен.
+    for (const el of flat) {
+      if (el.kind !== "picture" || !el.media) continue;
+      const b = box(el);
+      if (!b) continue;
+      const wPx = emuToPx(b.w);
+      const hPx = emuToPx(b.h);
+      if (wPx < slidePx.w * 0.85 || hPx < slidePx.h * 0.85) continue;
+      const m = mediaByName.get(el.media);
+      if (!m) continue;
+      const why = [];
+      if (m.role === "decor" || m.role === "logo") why.push(`role=${m.role}`);
+      if (m.visual && m.visual.hasAlpha) why.push("прозрачный PNG");
+      if (why.length) {
+        errors.push({
+          slide: slide.index,
+          check: "decor-as-background",
+          detail: `${el.media} (${why.join(", ")}) растянут как фон слайда — декор не фон; используйте [background]-медиа или цвет токена`,
+        });
+      }
     }
 
     // --- 2. Разбитые боксы «подложка + отдельный текстбокс».
@@ -456,8 +481,11 @@ function checkDeck(deck) {
 
   const fonts = new Set(deck.fontHistogram.map((f) => f.font));
   if (fonts.size > 4) warnings.push({ check: "font-variety", detail: `шрифтов больше четырёх: ${[...fonts].join(", ")}` });
-  if (!deck.totals.pics && !deck.totals.svgMedia && deck.totals.slides >= 6) {
-    info.push({ check: "image-coverage", detail: "в колоде нет картинок — только текст и фигуры" });
+  if (deck.totals.slides >= 6 && deck.totals.pics + deck.totals.svgMedia < 3) {
+    warnings.push({
+      check: "visual-scarcity",
+      detail: `в колоде почти нет графики (${deck.totals.pics} карт., ${deck.totals.svgMedia} svg на ${deck.totals.slides} слайдов) — добавьте иконки Lucide, графики или фото`,
+    });
   }
   const missingNotes = deck.slides.filter((s) => !s.notes).length;
   if (deck.totals.slides >= 3 && missingNotes / deck.totals.slides > 0.5) {

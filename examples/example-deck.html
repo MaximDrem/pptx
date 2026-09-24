@@ -198,15 +198,18 @@ svg {
 /* ===== tokens ===== */
 /* Grid Paper — tokens. Order: stage.css → this file → base.css. */
 :root {
-  --stage-bg: #101216;
-  --slide-bg: #ffffff;
-  --c-bg: #ffffff;
-  --c-surface: #f3f4f6;
-  --c-ink: #0b0b0c;
-  --c-muted: #63666b;
-  --c-accent: #2447f0;
+  --stage-bg: #e8e6de;
+  --slide-bg: #fafaf6;
+  --c-bg: #fafaf6;
+  --c-surface: #ffffff;
+  --c-ink: #131519;
+  --c-muted: #57606e;
+  --c-accent: #2e54f6;
+  --c-accent-2: #0e9b6e;
   --c-on-accent: #ffffff;
-  --c-line: rgba(11, 11, 12, 0.16);
+  --c-line: rgba(19, 21, 25, 0.12);
+  --cover-glow: radial-gradient(120% 95% at 82% -15%, rgba(46, 84, 246, 0.16), transparent 62%),
+    radial-gradient(90% 70% at -8% 108%, rgba(14, 155, 110, 0.1), transparent 58%);
   --radius: 2px;
   --f-display: "Unbounded", Arial, sans-serif;
   --f-body: "Inter", Arial, sans-serif;
@@ -536,6 +539,37 @@ svg {
 .slide.cover .headline { max-width: 17ch; }
 .slide.section .slide-pad { justify-content: center; }
 .slide.section .headline { color: var(--c-accent); }
+
+/* Cover/section backdrop: a soft two-color glow from the style tokens.
+   Put it FIRST inside the slide, before .slide-pad. */
+.cover-art {
+  position: absolute;
+  inset: 0;
+  background: var(--cover-glow, none);
+  pointer-events: none;
+}
+
+/* -------------------------------------------------------------- timeline */
+
+.timeline { display: flex; flex-direction: column; }
+.timeline .tl { display: grid; grid-template-columns: 96px 24px 1fr; gap: 14px; }
+.timeline .tl .t { font: 600 13px var(--f-body); color: var(--c-muted); text-align: right; padding-top: 2px; }
+.timeline .tl .rail { position: relative; }
+.timeline .tl .rail::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 18px;
+  bottom: -8px;
+  width: 2px;
+  background: var(--c-line);
+  transform: translateX(-50%);
+}
+.timeline .tl:last-child .rail::before { display: none; }
+.timeline .tl .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--c-accent); margin: 4px auto 0; position: relative; z-index: 1; }
+.timeline .tl .body { padding-bottom: 16px; min-width: 0; }
+.timeline .tl .body h3 { font-size: 15px; font-weight: 600; margin: 0 0 4px; color: var(--c-ink); }
+.timeline .tl .body p { font-size: 13.5px; line-height: 1.4; color: var(--c-muted); margin: 0; }
 
 /* --------------------------------------------------------------- charts
    SVG snippets live in charts.md. Geometry is authored (honest numbers),

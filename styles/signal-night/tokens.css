@@ -1,15 +1,18 @@
 /* Signal Night — tokens. Order: stage.css → this file → base.css. */
 :root {
   --stage-bg: #05070b;
-  --slide-bg: #0c1220;
-  --c-bg: #0c1220;
-  --c-surface: #16202f;
-  --c-ink: #f2f5f9;
-  --c-muted: #93a1b3;
+  --slide-bg: #0a1020;
+  --c-bg: #0a1020;
+  --c-surface: #141d33;
+  --c-ink: #eef3fc;
+  --c-muted: #96a3bb;
   --c-accent: #5ee0ff;
+  --c-accent-2: #37d399;
   --c-on-accent: #062430;
-  --c-line: rgba(242, 245, 249, 0.16);
-  --radius: 10px;
+  --c-line: rgba(238, 243, 252, 0.14);
+  --cover-glow: radial-gradient(120% 95% at 80% -15%, rgba(94, 224, 255, 0.2), transparent 62%),
+    radial-gradient(90% 70% at -10% 110%, rgba(55, 211, 153, 0.12), transparent 58%);
+  --radius: 8px;
   --f-display: "Unbounded", Arial, sans-serif;
   --f-body: "Inter", Arial, sans-serif;
   --f-mono: "JetBrains Mono", monospace;

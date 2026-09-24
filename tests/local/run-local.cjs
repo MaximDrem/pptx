@@ -58,7 +58,7 @@ async function main() {
 
   // 1b. Pure-node unit tests (no browser): pptx-post offset, artifact checks,
   //     render report/artifact contract.
-  for (const unit of ["pptx-post.test.cjs", "validate-checks.test.cjs", "render-report.test.cjs", "lint-deck.test.cjs", "expand-styles.test.cjs"]) {
+  for (const unit of ["pptx-post.test.cjs", "validate-checks.test.cjs", "render-report.test.cjs", "lint-deck.test.cjs", "expand-styles.test.cjs", "review.test.cjs"]) {
     const u = spawnSync(process.execPath, [path.join(__dirname, "..", "unit", unit)], { encoding: "utf8", timeout: 60000 });
     const tail = ((u.stdout || "") + (u.stderr || "")).trim().split("\n").pop() || "";
     record(`unit ${unit}`, u.status === 0, tail.slice(0, 180));
@@ -106,6 +106,14 @@ async function main() {
     const hsrun = runHarness(["probe", hsDeck]);
     const hsout = (hsrun.stdout || "") + (hsrun.stderr || "");
     record("probe: display:none слайд ловится", /HIDDEN-SLIDE/.test(hsout), hsout.includes("HIDDEN-SLIDE") ? "ok" : "not reported");
+  }
+
+  // 2f. Декор (.decor/.cover-art) может выходить за края слайда — probe чист.
+  {
+    const decDeck = assemble("decor-body.html");
+    const decrun = runHarness(["probe", decDeck]);
+    const decout = (decrun.stdout || "") + (decrun.stderr || "");
+    record("probe: декор за краями слайда не ловится", /probe: clean/.test(decout), decout.includes("clean") ? "ok" : decout.split("\n").slice(1, 3).join(" | "));
   }
 
   // 3. defect fixture: every issue type must fire.

@@ -1,4 +1,4 @@
-# presentation v2 — HTML-first presentations with a native .pptx export
+# presentation v3 — HTML-first presentations with a native .pptx export (vision)
 
 A skill for the work agent: the deck is built as **editable HTML**
 (`deck.html`, 1280×720 stage) and exported to **native PowerPoint** — real
@@ -27,6 +27,10 @@ density).
 | Artifact validation | `validate.cjs`: ports of the python checks (empty placeholders, split-box, WCAG contrast, hierarchy, fullness, density, repetition, notes) + font size, placeholders, typography, stage size, native text/fonts, normAutofit — plus a `validate.json` report | ✅ |
 | .pptx post-processing | `pptx-post.cjs`: exact→proportional line spacing (37 fixes per deck), PDF render without overlaps | ✅ |
 | Contract guards | `expand-styles` (managed CSS block), `hidden-slide`/`missing-br`/`no-accent`/`sparse-box` probe checks, export blocked on blocking issues (exit 4, no .pptx), temp-dir decks refused, `slide-count-mismatch` | ✅ |
+| Vision workflow (v3) | `shots.cjs` renders any .pptx to per-slide PNGs (via the app's `--pptx-verify`) + text digest; the SKILL requires looking at template slides before style copying and at own slides before delivery | ✅ (renderer on the work laptop) |
+| Template-copy guards (v3) | `validate`: `decor-as-background` error (transparent/decor media stretched as a background), `visual-scarcity` warning; `style-profile`: contrast guard for extracted ink/bg | ✅ |
+| Self-reflection driver (v3) | `review.cjs`: render → PNG paths → probe → validate → checklist in one command; template mode adds reference shots | ✅ |
+| Default style upgrade (v3) | rebuilt tokens for all three styles (accent-2, `--cover-glow`), `cover-art` glow on covers/sections, `timeline` pattern, themed surfaces | ✅ |
 
 Local acceptance run: `node tests/local/run-local.cjs` (Chrome required;
 the LibreOffice check is optional).

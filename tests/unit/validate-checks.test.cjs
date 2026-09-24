@@ -172,4 +172,35 @@ const BASE = ["Первый тезис этого слайда достаточ�
   assert.ok(!has(res.warnings, "fullness"), "footer text must not count as content");
 }
 
+// 13. decor-as-background: полнослайдовая прозрачная/декорная картинка — ошибка.
+{
+  const EMU = { W: 12192000, H: 6858000 };
+  const pic = (name) => ({
+    kind: "picture",
+    id: 50,
+    media: name,
+    box: { emu: { x: 0, y: 0, w: EMU.W, h: EMU.H } },
+  });
+  const mk = (media, picName) => ({
+    slideSize: { emu: { cx: EMU.W, cy: EMU.H } },
+    slides: [{ index: 0, notes: "n", elements: [el(BASE.join(" ")), pic(picName)], effectiveBg: null }],
+    media,
+    fontHistogram: [{ font: "Inter", n: 5 }],
+    totals: { slides: 1, pics: 1, svgMedia: 0, embeddedFonts: 1 },
+  });
+  const res = checkDeck(mk([{ name: "cat.png", role: "decor", visual: { hasAlpha: true } }], "cat.png"));
+  assert.ok(has(res.errors, "decor-as-background"), "full-slide transparent decor must be an error");
+  const ok = checkDeck(mk([{ name: "bg.jpg", role: "background", visual: { hasAlpha: false } }], "bg.jpg"));
+  assert.ok(!has(ok.errors, "decor-as-background"), "a real full-slide background photo must pass");
+}
+
+// 14. visual-scarcity: длинная колода почти без графики — warning.
+{
+  const slides = Array.from({ length: 6 }, () => ({ elements: [el(BASE.join(" "))], notes: "n" }));
+  const res = checkDeck(deck(slides, { pics: 0, svgMedia: 0 }));
+  assert.ok(has(res.warnings, "visual-scarcity"), "a text-only 6-slide deck must warn about visuals");
+  const withIcons = checkDeck(deck(slides, { pics: 2, svgMedia: 4 }));
+  assert.ok(!has(withIcons.warnings, "visual-scarcity"), "icons and pictures satisfy the visual budget");
+}
+
 console.log("PASS  validate: новые проверки артефакта (кегль, контраст, заглушки, типографика, размер, шрифты, autofit, заметки)");

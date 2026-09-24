@@ -18,7 +18,11 @@ Rules shared by all patterns:
 - speaker notes: `<template data-pptx-notes>text</template>` — hidden on the
   slide, exported into .pptx notes;
 - colors/fonts only via tokens (`var(--c-*)`, `var(--f-*)`). No hex in markup:
-  switching a style must be a one-file token swap.
+  switching a style must be a one-file token swap;
+- every content slide has a **visual anchor**: a Lucide icon, a chart, a photo
+  or a big number. Text-only card walls read as empty (validate warns
+  `visual-scarcity`); icons are copied as ready `<svg class="icon">` lines
+  from `styles/_base/icons.md`.
 
 ## One-box rule (verified by export)
 
@@ -74,6 +78,8 @@ to 260px.
 
 ```html
 <section class="slide cover" data-role="cover">
+  <div class="cover-art" aria-hidden="true"></div>
+  <div class="decor decor-dots pos-tr"></div>
   <div class="slide-pad">
     <div class="kicker">Product team · Q3 2026</div>
     <h1 class="headline xl wide">Cover headline in two lines</h1>
@@ -83,12 +89,20 @@ to 260px.
 </section>
 ```
 
-Headline: 5–9 words, no period. `.lead` — at most two lines.
+Headline: 5–9 words, no period. `.lead` — at most two lines. `.cover-art`
+paints the style's two-color glow and `.decor` adds texture — always include at
+least one decor element on covers/sections/closings; it is what separates
+"designed" from "typed". Decor never carries text and may bleed off-slide
+(probe skips it). Useful picks: `.decor-dots.pos-tr`, `.decor-ring.pos-tr`,
+`.decor-blob.pos-bl`, `.decor-blob.alt.pos-tl`. With a brand template add the
+logo (`<img>` ~120px wide, top corner) and/or the template's background.
 
 ## 2. section
 
 ```html
 <section class="slide section" data-role="section">
+  <div class="cover-art" aria-hidden="true"></div>
+  <div class="decor decor-ring pos-tr"></div>
   <div class="slide-pad">
     <div class="content">
       <div class="kicker">Section 2</div>
@@ -279,6 +293,8 @@ the sum of previous shares.
 ```html
 <section class="slide" data-role="closing">
   <template data-pptx-notes>Ask for a decision, point by point.</template>
+  <div class="cover-art" aria-hidden="true"></div>
+  <div class="decor decor-blob pos-bl"></div>
   <div class="slide-pad">
     <div class="content center">
       <blockquote class="quote">«A short quote that fixes the main idea.»
@@ -294,6 +310,31 @@ the sum of previous shares.
   </div>
 </section>
 ```
+
+## 11. timeline — a day/process with time marks
+
+```html
+<div class="timeline">
+  <div class="tl">
+    <div class="t">09:00</div>
+    <div class="rail"><div class="dot"></div></div>
+    <div class="body"><h3>Morning</h3><p>The assistant collects overnight summaries.</p></div>
+  </div>
+  <div class="tl">
+    <div class="t">14:00</div>
+    <div class="rail"><div class="dot"></div></div>
+    <div class="body"><h3>Meeting</h3><p>A brief on participants and the agenda, ready before the call.</p></div>
+  </div>
+  <div class="tl">
+    <div class="t">19:00</div>
+    <div class="rail"><div class="dot"></div></div>
+    <div class="body"><h3>Evening</h3><p>The day's outcomes structured into a report.</p></div>
+  </div>
+</div>
+```
+
+3–5 rows; the time column is short (`09:00`, `Q1`, `утро`). Pair with a
+`.split` when a summary/chart belongs next to it.
 
 ## Deck rhythm
 

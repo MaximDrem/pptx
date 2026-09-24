@@ -1,15 +1,18 @@
 /* Ink Press — tokens. Order: stage.css → this file → base.css. */
 :root {
   --stage-bg: #2a241d;
-  --slide-bg: #faf6ef;
-  --c-bg: #faf6ef;
-  --c-surface: #f1e9dc;
-  --c-ink: #211a13;
-  --c-muted: #6d6153;
-  --c-accent: #b23a2f;
+  --slide-bg: #f7f2e9;
+  --c-bg: #f7f2e9;
+  --c-surface: #fffdf8;
+  --c-ink: #201b16;
+  --c-muted: #675e52;
+  --c-accent: #b0492e;
+  --c-accent-2: #3e6b57;
   --c-on-accent: #fdf9f3;
-  --c-line: rgba(33, 26, 19, 0.2);
-  --radius: 0px;
+  --c-line: rgba(32, 27, 22, 0.16);
+  --cover-glow: radial-gradient(110% 90% at 85% -12%, rgba(176, 73, 46, 0.12), transparent 60%),
+    radial-gradient(90% 70% at -8% 110%, rgba(62, 107, 87, 0.1), transparent 58%);
+  --radius: 3px;
   --f-display: "Source Serif 4", Georgia, serif;
   --f-body: "Inter", Arial, sans-serif;
   --f-mono: "JetBrains Mono", monospace;
