@@ -174,6 +174,7 @@ function renderDeck(deckPath, opts = {}) {
         "low-contrast",
         "blank",
         "maybe-blank",
+        "mostly-empty",
         "broken-image",
         "stage-broken",
         "probe-error",

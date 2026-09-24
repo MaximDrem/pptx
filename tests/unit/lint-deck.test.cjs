@@ -54,9 +54,12 @@ assert.ok(bypass.errors.length > 0, "GIGATOOL_DECK_LINT=0 must not disable lint 
   fs.mkdirSync(path.join(profileDir, "assets"), { recursive: true });
   fs.writeFileSync(path.join(profileDir, "assets", "logo.png"), "not-a-real-png");
   fs.writeFileSync(path.join(profileDir, "assets", "cat.png"), "not-a-real-png");
+  fs.writeFileSync(path.join(profileDir, "assets", "bg.png"), "not-a-real-png");
   fs.writeFileSync(
     path.join(profileDir, "profile.json"),
-    JSON.stringify({ media: { extracted: [{ name: "logo.png", role: "logo" }, { name: "cat.png", role: "decor" }] } }),
+    JSON.stringify({
+      media: { extracted: [{ name: "logo.png", role: "logo" }, { name: "cat.png", role: "decor" }, { name: "bg.png", role: "background" }] },
+    }),
   );
   const deck = path.join(dir, "template.deck.html");
   fs.writeFileSync(
@@ -84,6 +87,18 @@ assert.ok(bypass.errors.length > 0, "GIGATOOL_DECK_LINT=0 must not disable lint 
   assert.ok(
     bgOnlyRes.errors.join("\n").includes("has decor assets but the deck uses none"),
     "background-only copy must fail the decor rule",
+  );
+
+  // Decor only: the background is still flat — that is also a failed copy.
+  const decorOnly = bgOnly.replace('<img class="bg-img" src="images/template-bg.png" alt="">', "").replace(
+    "</section>",
+    '<img class="decor-img" style="left:900px; top:-120px; width:380px" src="images/template-decor-1.png" alt=""></section>',
+  );
+  fs.writeFileSync(deck, decorOnly);
+  const decorOnlyRes = lintDeck(deck, { quiet: true });
+  assert.ok(
+    decorOnlyRes.errors.join("\n").includes("uses an image background but the deck has none"),
+    "decor-only copy must fail the background rule",
   );
 
   // Adding one decor clears both errors.

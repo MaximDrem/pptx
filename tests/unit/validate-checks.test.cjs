@@ -203,4 +203,18 @@ const BASE = ["Первый тезис этого слайда достаточ�
   assert.ok(!has(withIcons.warnings, "visual-scarcity"), "icons and pictures satisfy the visual budget");
 }
 
+// 15. split-box: плашка + отдельный текстбокс — теперь error (одна фигура).
+{
+  const shape = {
+    kind: "shape",
+    id: 7,
+    name: "Backdrop",
+    box: { emu: { x: 1000000, y: 2000000, w: 4000000, h: 1500000 } },
+    fill: { type: "solid", hex: "#eeeeee" },
+  };
+  const label = el(BASE.join(" "), { id: 8, emu: { x: 1200000, y: 2200000, w: 3600000, h: 1100000 } });
+  const res = checkDeck(deck([{ elements: [shape, label] }]));
+  assert.ok(has(res.errors, "split-box"), "backdrop + separate text must be an error (one-box rule)");
+}
+
 console.log("PASS  validate: новые проверки артефакта (кегль, контраст, заглушки, типографика, размер, шрифты, autofit, заметки)");

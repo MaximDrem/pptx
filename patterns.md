@@ -65,9 +65,11 @@ one click.
   equally — an accent that marks nothing marks nothing;
 - **accent discipline**: accent is small by design — badges, icons, numbers,
   one short card (≤2 lines), a highlighted row. Headings stay ink (only
-  section dividers are accent); a heading painted in accent → error
-  `accent-heading`. A surface over 40% of the slide → error `accent-overload`
-  (the acid "slab" defect: never paint a content block with accent);
+  section dividers are accent). A surface over 40% of the slide → error
+  `accent-overload` (the acid "slab" defect: never paint a content block with
+  an opaque accent). For a highlighted block use the template's recipe:
+  `.card.tint` (translucent `--c-accent-soft`) reads as a highlight, while
+  `.card.accent` (solid) is only for ONE short key message;
 - the kicker, footer, soft icon badges and icon strokes do NOT count as
   emphasis: they are chrome, not signal.
 

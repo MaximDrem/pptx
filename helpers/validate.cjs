@@ -285,10 +285,13 @@ function checkDeck(deck) {
         if (!tb || isFullSlideBox(tb)) continue;
         const cover = overlapArea(tb, b) / Math.max(1, area(tb));
         if (cover >= SPLIT_COVER_FRAC && area(tb) / area(b) <= 0.95) {
-          warnings.push({
+          // Structural, not taste: a split box is no longer one editable shape
+          // in PowerPoint — the exact promise of the one-box rule (real
+          // regression in a template-copy run where from-scratch was fine).
+          errors.push({
             slide: slide.index,
             check: "split-box",
-            detail: `плашка «${el.name || el.id}» + отдельный текст «${textOf(t).replace(/\\s+/g, " ").slice(0, 40)}» — в PowerPoint это два объекта; текст пишется ранами прямо в бокс`,
+            detail: `плашка «${el.name || el.id}» + отдельный текст «${textOf(t).replace(/\s+/g, " ").slice(0, 40)}» — в PowerPoint это два объекта; текст пишется ранами прямо в бокс (правило одного бокса)`,
           });
         }
       }
@@ -529,6 +532,7 @@ function mergeHtmlReport(rep, out) {
             "low-contrast",
             "blank",
             "maybe-blank",
+            "mostly-empty",
             "broken-image",
             "stage-broken",
             "probe-error",

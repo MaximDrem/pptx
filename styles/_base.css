@@ -107,6 +107,7 @@
   min-width: 0;
 }
 .card.accent { background: var(--c-accent); color: var(--c-on-accent); border-color: transparent; }
+.card.tint { background: var(--c-accent-soft, rgba(0, 0, 0, 0.05)); border-color: transparent; }
 .card.inverse { background: var(--c-ink); color: var(--c-bg); border-color: transparent; }
 .card.inverse h3, .card.inverse p, .card.inverse .card-cap { color: var(--c-bg); }
 .card.accent h3, .card.accent p, .card.accent .card-cap, .card.accent .list li { color: var(--c-on-accent); }

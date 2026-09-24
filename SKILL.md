@@ -233,9 +233,11 @@ Markup rules:
   warns `no-accent`);
 - **accent discipline**: accent is produced with SMALL elements — badges,
   icons, numbers, one short card (≤2 lines), a highlighted row. Headings stay
-  ink (only section dividers are accent); never paint a content block with
-  accent — a surface over 40% of the slide is a slab, not an accent
-  (suggestions `accent-heading` / `accent-overload`);
+  ink (only section dividers are accent); never paint a content block with an
+  OPAQUE accent — a surface over 40% of the slide is a slab (error
+  `accent-overload`). When the template highlights blocks, copy its recipe: a
+  translucent tint (`.card.tint` / `--c-accent-soft`), not a solid fill;
+  suggestions `accent-heading`;
 - **visual anchor**: every content slide has something to look at — a Lucide
   icon, a chart, a photo or a big number. A deck of text-only cards reads as
   empty even when the text is there (probe: `sparse-box`, validate:
@@ -254,7 +256,10 @@ Markup rules:
   no emoji — never draw your own paths;
 - images — local files (`<img src="images/...">` with `alt`), generated ONLY
   with a chat tool (e.g. `gigachat_image`) before assembling; template media —
-  copied next to the deck and verified by looking at them;
+  copied next to the deck and verified by looking at them. **One image = one
+  meaning**: never place the same file on two slides (probe flags
+  `image-reuse`), and a photo must fill a real block — a full-size picture
+  squeezed into a small tile reads as an accident (probe flags `tiny-image`);
 - no external links/fonts/scripts (except our navigator);
 - write 8–14 slides in one pass; more — in two passes.
 

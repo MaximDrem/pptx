@@ -83,21 +83,32 @@ function lintDeck(deckPath, opts = {}) {
           `run style-profile.cjs <template.pptx> --name "…" --deploy <this deck's folder> and paste the snippets from images/template-assets.md`,
       );
     }
-    // A copy that keeps only the background loses the recognisable decor — the
-    // template profile knows it has decor, so at least one must be placed.
-    let hasDecor = false;
+    // A copy that keeps only the background loses the recognisable decor; a
+    // copy that keeps only the boxes leaves the background flat — both were
+    // real failures. The profile knows which roles it has.
+    let extracted = [];
     try {
       const profile = JSON.parse(fs.readFileSync(path.join(stylesDir, profileMatch[2].trim(), "profile.json"), "utf8"));
-      hasDecor = ((profile.media && profile.media.extracted) || []).some((a) => a.role === "decor");
+      extracted = (profile.media && profile.media.extracted) || [];
     } catch {
-      hasDecor = false;
+      extracted = [];
     }
+    const hasDecor = extracted.some((a) => a.role === "decor");
+    const hasBg = extracted.some((a) => a.role === "background");
     const usesDecor = /class=(["'])[^"']*\b(?:decor|decor-img)\b/.test(raw);
     if (hasDecor && !usesDecor) {
       errors.push(
         `template profile «${profileMatch[2].trim()}» has decor assets but the deck uses none — the copy loses the original's recognisable elements. ` +
           `Place at least one deployed decor anywhere sensible (class="decor-img", see images/template-assets.md for hints); ` +
           `position, size and the choice of decor are yours`,
+      );
+    }
+    const usesBg = /class=(["'])[^"']*\bbg-img\b/.test(raw) || /background-image\s*:/.test(raw);
+    if (hasBg && !usesBg) {
+      errors.push(
+        `template profile «${profileMatch[2].trim()}» uses an image background but the deck has none — a flat fill is not a style copy. ` +
+          `Add <img class="bg-img" src="images/template-bg…" alt=""> as the first child of the slides that have it in the template ` +
+          `(or set background-image yourself); use a token background only if the template is flat`,
       );
     }
   }

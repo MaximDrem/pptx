@@ -128,6 +128,22 @@ async function main() {
     );
   }
 
+  // 2h. Одна и та же картинка на двух слайдах — suggestion.
+  {
+    const ruDeck = assemble("reuse-body.html");
+    const rurun = runHarness(["probe", ruDeck]);
+    const ruout = (rurun.stdout || "") + (rurun.stderr || "");
+    record("probe: повтор картинки ловится", /IMAGE-REUSED|IMAGE-REUSE/.test(ruout), ruout.includes("IMAGE-REUSE") ? "ok" : "not reported");
+  }
+
+  // 2i. Слайд, забитый пустотой, — error.
+  {
+    const meDeck = assemble("mostly-empty-body.html");
+    const merun = runHarness(["probe", meDeck]);
+    const meout = (merun.stdout || "") + (merun.stderr || "");
+    record("probe: пустой слайд ловится", /MOSTLY-EMPTY/.test(meout), meout.includes("MOSTLY-EMPTY") ? "ok" : "not reported");
+  }
+
   // 3. defect fixture: every issue type must fire.
   const defect = assemble("defect-body.html");
   const defectRun = runHarness(["probe", defect]);

@@ -188,6 +188,9 @@ Two levels in one report:
 | `accent-heading` | a heading is painted in the accent color | headings stay ink; only section dividers use accent (probe error) |
 | `accent-overload` | an accent-filled surface covers >40% of the slide (the acid "slab") | keep accent to badges, numbers, one short card; content blocks use surface (probe error) |
 | `plain-cover` | the cover has no visual layer at all | add `cover-art`, decor, a logo or the template background |
+| `image-reuse` | the same non-chrome picture appears on 2+ slides (one generated image on three slides was a real case) | one image = one meaning: vary the file or drop the repeats |
+| `tiny-image` | a full-size picture is rendered as a small tile | enlarge it into an illustration or remove it |
+| `mostly-empty` | the content occupies only the middle of the slide (error: over 40% empty above AND below) | add substance or switch the pattern |
 | `empty-placeholder` | a filled placeholder with no text or content |
 | `split-box` | "backdrop + separate textbox" (text not written as runs in the box) |
 | `contrast` | run contrast: error < 3.0 (WCAG AA large text), warning < 4.5 (WCAG AA body); inheritance-aware and blending translucent fills |
@@ -307,6 +310,7 @@ structure, the eyes decide taste.
 | `img-no-alt` | an `<img>` has no `alt` attribute | add alt text (empty `alt=""` for decoration) |
 | `hidden-slide` | the slide is `display:none` or zero-sized — the export engine skips it (a real deck lost 8 of 10 slides this way) | hide slides with `.active` only; never `display:none` |
 | `the deck uses none of the template assets` (lint) | the deck copies a style profile that has assets, but no `<img>` uses them | run `style-profile.cjs <pptx> --deploy <deck-dir>` and paste the `images/template-assets.md` snippets (`bg-img`/`logo`/`decor-img`) |
+| `uses an image background but the deck has none` (lint) | a copy left the background flat | add `<img class="bg-img" …>` on the slides that have it in the template |
 | `has decor assets but the deck uses none` (lint) | the background was copied but the template decor ignored — the copy loses its recognisable elements | place **any** deployed decor somewhere sensible (`decor-img`); the map in `images/template-assets.md` is a hint — move/resize/swap decor freely |
 | `missing-br` | two text rows in one box are not separated by `<br>` | add `<br>` between the rows — the export is blocked, PowerPoint would show one line |
 | `no-accent` | a content slide has no emphasis accent | highlight the key card/step/number/table row (see patterns.md, "Accent budget") |

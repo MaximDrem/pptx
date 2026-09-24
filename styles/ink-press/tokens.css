@@ -8,6 +8,7 @@
   --c-muted: #675e52;
   --c-accent: #b0492e;
   --c-accent-2: #3e6b57;
+  --c-accent-soft: rgba(176, 73, 46, 0.1);
   --c-on-accent: #fdf9f3;
   --c-line: rgba(32, 27, 22, 0.16);
   --cover-glow: radial-gradient(110% 90% at 85% -12%, rgba(176, 73, 46, 0.12), transparent 60%),

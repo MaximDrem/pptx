@@ -10,6 +10,7 @@
   --c-muted: #5a6570;
   --c-accent: #17812f;
   --c-accent-2: #0098f8;
+  --c-accent-soft: rgba(23, 129, 47, 0.1);
   --c-on-accent: #ffffff;
   --c-line: rgba(11, 15, 20, 0.12);
   --grad-brand: linear-gradient(115deg, #0098f8 0%, #21a038 55%, #f1e813 100%);

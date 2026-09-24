@@ -545,6 +545,17 @@
       push("img-no-alt", `${altMissing} image(s) without an alt attribute — add alt text (or alt="" for decoration)`);
     }
 
+    // A real photo placed as a small bullet reads as an accident: if the
+    // natural size is big but the rendered area is tiny, enlarge it.
+    for (const img of Array.from(slide.querySelectorAll("img"))) {
+      if (img.closest(".decor, .cover-art, .bg-img, .logo, .decor-img")) continue;
+      const r = img.getBoundingClientRect();
+      if (r.width * r.height > 0.06 * slideArea) continue;
+      if (!img.naturalWidth || img.naturalWidth < 400) continue;
+      push("tiny-image", "a full-size picture is rendered as a small tile — enlarge it into an illustration or drop it");
+      break;
+    }
+
     // Rows inside a painted box must be separated by <br>: the exporter merges
     // all runs of a box into one <a:p>, so without <br> PowerPoint shows the
     // title and the body on a single line.
@@ -600,7 +611,10 @@
       for (const el of Array.from(slide.querySelectorAll("*"))) {
         if (isDecor(el)) continue;
         const st = getComputedStyle(el);
-        if (!nearAccent(parseColor(st.backgroundColor))) continue;
+        const c = parseColor(st.backgroundColor);
+        // Only an OPAQUE accent surface is an accent slab; translucent tints
+        // (.card.tint) are the recommended way to highlight a block.
+        if (!nearAccent(c) || (c && c.a < 0.5)) continue;
         const r = el.getBoundingClientRect();
         const a = r.width * r.height;
         if (a > accentArea) accentArea = a;
@@ -687,15 +701,20 @@
       if (isFullSlide(rect, slideRect)) continue;
       contentRects.push(media ? rect : blockRectFor(el, slide, slideRect));
     }
-    if (contentRects.length >= 3) {
+    // For content slides even one or two elements are enough to judge the
+    // emptiness; airy roles (cover/section/quote/closing) keep the old gate.
+    if (contentRects.length >= 3 || (!airy && contentRects.length >= 1)) {
       const firstTop = Math.min.apply(null, contentRects.map((r) => r.top));
       const lastBottom = Math.max.apply(null, contentRects.map((r) => r.bottom));
       const emptyTop = (firstTop - bandTop) / bandHeight;
       const emptyBottom = (bandBottom - lastBottom) / bandHeight;
       if (airy) {
         if (emptyBottom > 0.45) push("empty-region", `bottom ${Math.round(emptyBottom * 100)}% of the content band is empty`);
-      } else if (emptyTop > 0.42 && emptyBottom > 0.42) {
-        push("empty-region", "the slide is mostly empty — add substance (blocks, copy, a diagram)");
+      } else if (contentRects.reduce((s, r) => s + Math.max(0, r.bottom - r.top), 0) < 0.25 * bandHeight) {
+        // A heading plus one small block on an empty canvas is the real
+        // "много пустого места" defect: measure how much of the band the
+        // content actually covers (kicker/headline count, footer excluded).
+        push("mostly-empty", "the slide is mostly empty — content covers less than a quarter of the canvas; add substance or switch the pattern");
       } else if (emptyTop > emptyLimit && emptyTop > emptyBottom * 1.5) {
         push("empty-region", `top ${Math.round(emptyTop * 100)}% of the content band is empty — did the heading get lost?`);
       } else if (emptyBottom > emptyLimit && emptyBottom > emptyTop * 1.5) {
@@ -748,6 +767,7 @@
     "low-contrast",
     "blank",
     "maybe-blank",
+    "mostly-empty",
     "broken-image",
     "stage-broken",
     "probe-error",
@@ -758,8 +778,9 @@
 
   function report() {
     const stageR = stageRect();
-    return withAllSlidesMeasurable(() =>
-      slides().map((slide, i) => {
+    const list = slides();
+    const results = withAllSlidesMeasurable(() =>
+      list.map((slide, i) => {
         try {
           const res = checkSlide(slide, i, stageR);
           return { ...res, issues: (res.issues || []).map(withSeverity) };
@@ -768,6 +789,29 @@
         }
       }),
     );
+    // Deck-level: the same non-chrome picture repeated across slides (real
+    // complaint: one generated cat appeared on three slides, two in a row).
+    const srcSlides = new Map();
+    list.forEach((slide, idx) => {
+      for (const img of Array.from(slide.querySelectorAll("img"))) {
+        if (img.closest(".decor, .cover-art, .bg-img, .logo, .decor-img")) continue;
+        const src = img.getAttribute("src") || "";
+        if (!src) continue;
+        if (!srcSlides.has(src)) srcSlides.set(src, []);
+        srcSlides.get(src).push(idx);
+      }
+    });
+    for (const [, idxs] of srcSlides) {
+      if (idxs.length < 2) continue;
+      const last = idxs[idxs.length - 1];
+      results[last].issues.push(
+        withSeverity({
+          type: "image-reuse",
+          detail: `the same picture appears on ${idxs.length} slides (${idxs.map((i) => i + 1).join(", ")}) — one image = one meaning; vary the image or drop the repeats`,
+        }),
+      );
+    }
+    return results;
   }
 
   // ------------------------------------------------------------- exportPrep

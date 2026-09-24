@@ -420,6 +420,7 @@ function tokensCss(p, slug) {
   --c-muted: ${p.muted};
   --c-accent: ${p.accent};
   --c-accent-2: ${a2};
+  --c-accent-soft: ${p.accent}22;
   --c-on-accent: ${p.darkBg ? "#062430" : "#FFFFFF"};
   --c-line: rgba(${p.darkBg ? "242, 245, 249" : "11, 11, 12"}, 0.16);
   --cover-glow: radial-gradient(120% 95% at 80% -15%, ${p.accent}30, transparent 62%),
