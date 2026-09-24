@@ -622,6 +622,10 @@
       if (slideArea > 0 && accentArea / slideArea > 0.4) {
         push("accent-overload", "an accent-filled block covers over 40% of the slide — accent is emphasis, not a content background; use .card + a small accent element");
       }
+      const accentCards = slide.querySelectorAll(".card.accent").length;
+      if (accentCards >= 2) {
+        push("accent-cards", `${accentCards} solid accent cards on one slide — a wall of filled boxes; keep at most one and use .card.tint for the other highlights`);
+      }
     }
 
     // A cover with no visual at all reads as a typed page.

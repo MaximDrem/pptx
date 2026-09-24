@@ -65,6 +65,7 @@ one click.
 - more than one accent per slide is allowed when the layout expresses real
   hierarchy (e.g. two key cards among six), but do not accent everything
   equally — an accent that marks nothing marks nothing;
+- a wall of `.card.accent` reads as a color block: at most one solid accent card per slide, `.card.tint` for secondary highlights (probe suggests `accent-cards`);
 - **accent discipline**: accent is small by design — badges, icons, numbers,
   one short card (≤2 lines), a highlighted row. Headings stay ink (only
   section dividers are accent). A surface over 40% of the slide → error

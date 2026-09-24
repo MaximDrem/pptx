@@ -59,6 +59,8 @@ assert.ok(bypass.errors.length > 0, "GIGATOOL_DECK_LINT=0 must not disable lint 
     path.join(profileDir, "profile.json"),
     JSON.stringify({
       media: { extracted: [{ name: "logo.png", role: "logo" }, { name: "cat.png", role: "decor" }, { name: "bg.png", role: "background" }] },
+      source: { slides: 10 },
+      density: { imageBackgrounds: 8 },
     }),
   );
   const deck = path.join(dir, "template.deck.html");
@@ -100,6 +102,24 @@ assert.ok(bypass.errors.length > 0, "GIGATOOL_DECK_LINT=0 must not disable lint 
     decorOnlyRes.errors.join("\n").includes("uses an image background but the deck has none"),
     "decor-only copy must fail the background rule",
   );
+
+  // Backgrounds on cover/closing only: a copy must keep them on most slides.
+  {
+    const four = `<section class="slide" data-role="content"><div class="slide-pad">A</div></section>
+<section class="slide" data-role="content"><div class="slide-pad">B</div></section>
+<section class="slide" data-role="content"><div class="slide-pad">C</div></section>
+<section class="slide" data-role="content"><div class="slide-pad">D</div></section>`;
+    const sparse = fs
+      .readFileSync(deck, "utf8")
+      .replace(/<section class="slide" data-role="content"><div class="slide-pad">[^<]*<\/div><\/section>/g, "")
+      .replace("</div></div></body></html>", '<img class="bg-img" src="images/template-bg.png" alt="">' + four + "</div></div></body></html>");
+    fs.writeFileSync(deck, sparse);
+    const sparseRes = lintDeck(deck, { quiet: true });
+    assert.ok(
+      sparseRes.errors.join("\n").includes("backgrounds on cover/closing only"),
+      "backgrounds missing on most slides must be an error",
+    );
+  }
 
   // Adding one decor clears both errors.
   const withDecor = bgOnly.replace("</section>", '<img class="decor-img" style="left:900px; top:-120px; width:380px" src="images/template-decor-1.png" alt=""></section>');

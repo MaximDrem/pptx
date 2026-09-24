@@ -145,7 +145,41 @@ function pickColors(deck) {
   }
   // Тёмная поверхность — лёгкое осветление фона (не ×2, иначе цвет уезжает);
   // светлая — лёгкое затемнение.
-  const surface = darkBg ? mix(bgHex, "#FFFFFF", 0.08) : shade(bgHex, 0.955);
+  let surface = darkBg ? mix(bgHex, "#FFFFFF", 0.08) : shade(bgHex, 0.955);
+  // Better evidence: if the template paints its content boxes with a specific
+  // fill (usually a translucent white/black), reuse it — otherwise the copied
+  // cards look nothing like the original (real incident: flat navy cards vs
+  // the template's rgba(255,255,255,0.15) boxes).
+  const fillCount = new Map();
+  const boxAreaMin = deck.slideSize.emu.cx * deck.slideSize.emu.cy * 0.005;
+  const boxAreaMax = deck.slideSize.emu.cx * deck.slideSize.emu.cy * 0.8;
+  const walkFills = (els) => {
+    for (const el of els || []) {
+      const f = el.fill;
+      const b = el.box && el.box.emu;
+      if (f && f.type === "solid" && f.hex && b) {
+        const a = (b.w || 0) * (b.h || 0);
+        const alpha = f.alpha === undefined ? 1 : f.alpha;
+        const key = `${f.hex}:${alpha}`;
+        if (a >= boxAreaMin && a <= boxAreaMax && !(alpha < 0.05)) {
+          if (!fillCount.has(key)) fillCount.set(key, { hex: f.hex, alpha, count: 0 });
+          fillCount.get(key).count++;
+        }
+      }
+      if (el.children) walkFills(el.children);
+    }
+  };
+  for (const s of deck.slides) walkFills(s.elements);
+  const topFills = [...fillCount.values()].sort((a, b) => b.count - a.count);
+  const boxFill = topFills.find((f) => f.hex.toLowerCase() !== String(bgHex).toLowerCase()) || null;
+  let surfaceSource = null;
+  if (boxFill && boxFill.count >= 2) {
+    surface =
+      boxFill.alpha < 0.99
+        ? `rgba(${parseInt(boxFill.hex.slice(1, 3), 16)}, ${parseInt(boxFill.hex.slice(3, 5), 16)}, ${parseInt(boxFill.hex.slice(5, 7), 16)}, ${+boxFill.alpha.toFixed(2)})`
+        : boxFill.hex;
+    surfaceSource = { fill: boxFill.hex, alpha: +boxFill.alpha.toFixed(2), shapes: boxFill.count };
+  }
 
   return {
     theme,
@@ -154,6 +188,7 @@ function pickColors(deck) {
     accent2,
     bg: bgHex,
     surface,
+    surfaceSource,
     ink,
     muted,
     darkBg,
@@ -233,7 +268,7 @@ function pickAssets(deck, mode) {
   if (mode === "all") return TOP(ranked, cap).filter((m) => !["emf", "wmf", "wdp"].includes(m.ext));
   // Key mode: quotas per role — a "style copy" without the template's logo,
   // decor or photo is not a copy (real incident: only backgrounds came out).
-  const quotas = { background: 2, logo: 1, decor: 3, photo: 1 };
+  const quotas = { background: 4, logo: 1, decor: 2, photo: 1 };
   const out = [];
   const used = new Set();
   const take = (m) => {
@@ -278,11 +313,11 @@ async function extractAssets(deckFile, mediaList, dir) {
 // snippets + a PLACEMENT MAP from the source deck (which template slide uses
 // the asset and at what stage-px coordinates). This exists because real runs
 // copied only tokens (or only a background) and lost the template's decor.
-function deployAssets(assetsDir, written, deckDir, deck) {
+function deployAssets(assetsDir, written, deckDir, deck, colors) {
   const images = path.join(deckDir, "images");
   fs.mkdirSync(images, { recursive: true });
   const pick = (role, n = 1) => written.filter((a) => a.role === role).slice(0, n);
-  const bg = pick("background", 1)[0];
+  const bgs = pick("background", 4);
   const logo = pick("logo", 1)[0];
   // Decor: only art that is actually visible — placed on slides first; a
   // layout-only decor is a hint (and orphan layouts must not be deployed at
@@ -338,20 +373,22 @@ function deployAssets(assetsDir, written, deckDir, deck) {
     return out;
   };
 
-  if (bg) {
-    const n = copyAs(bg, "template-bg");
+  bgs.forEach((bg, bi) => {
+    const n = copyAs(bg, bgs.length === 1 ? "template-bg" : `template-bg-${bi + 1}`);
     const slides = bgSlides(bg.name);
     lines.push(
-      "## Background",
+      `## Background${bgs.length === 1 ? "" : ` ${bi + 1}`}`,
       "",
-      slides.length ? `Used as the slide background on template slides: ${slides.join(", ")}` : "",
+      slides.length
+        ? `Used as the slide background on template slides: ${slides.join(", ")} — put a background on EVERY slide that has one in the template (content slides included, not only cover/closing)`
+        : "The template uses this image as a background layer",
       "",
       "```html",
       `<img class="bg-img" src="images/${n}" alt="">`,
       "```",
       "",
     );
-  }
+  });
   if (logo) {
     const n = copyAs(logo, "template-logo");
     const rows = usage(logo.name);
@@ -391,8 +428,22 @@ function deployAssets(assetsDir, written, deckDir, deck) {
       "",
     );
   });
-  if (!bg && !logo && !decor.length) {
+  if (!bgs.length && !logo && !decor.length) {
     lines.push("_The template has no reusable background/logo/decor (a flat token-only style)._");
+  }
+  if (colors && colors.surfaceSource) {
+    const src = colors.surfaceSource;
+    lines.push(
+      "## Boxes",
+      "",
+      `Content boxes in the template are painted with ${src.fill} at ${Math.round(src.alpha * 100)}% (${src.shapes} shapes). ` +
+        `The profile tokens already set --c-surface to it, so plain .card matches the original.`,
+      "",
+      "- content box = `.card` (uses the template's surface);",
+      "- accent highlight = `.card.tint` (translucent accent via --c-accent-soft);",
+      "- solid `.card.accent` — at most ONE short key message per slide, never a wall of green boxes.",
+      "",
+    );
   }
   lines.push(
     "## Checklist",
@@ -404,7 +455,7 @@ function deployAssets(assetsDir, written, deckDir, deck) {
     "",
   );
   fs.writeFileSync(path.join(images, "template-assets.md"), lines.join("\n"));
-  return { bg: !!bg, logo: !!logo, decor: decor.length, dir: images };
+  return { bg: bgs.length > 0, backgrounds: bgs.length, logo: !!logo, decor: decor.length, dir: images };
 }
 
 function tokensCss(p, slug) {
@@ -500,6 +551,7 @@ async function main() {
     tokens: {
       bg: colors.bg,
       surface: colors.surface,
+      surfaceSource: colors.surfaceSource,
       ink: colors.ink,
       muted: colors.muted,
       accent: colors.accent,
@@ -521,7 +573,9 @@ async function main() {
       gradients: deck.totals.gradients,
       custGeom: deck.totals.custGeom,
       notes: deck.totals.notes,
-      imageBackgrounds: deck.slides.filter((s) => s.bg && s.bg.type === "image").length,
+      // Effective = including backgrounds inherited from layouts/masters —
+      // corporate templates paint most slides that way.
+      imageBackgrounds: deck.slides.filter((s) => s.effectiveBg && s.effectiveBg.type === "image").length,
     },
     media: {
       total: deck.totals.media,
@@ -551,8 +605,8 @@ async function main() {
   if (colors.imageBgSlides) console.log(`note: ${colors.imageBgSlides} slide(s) use image backgrounds — reuse assets/ backgrounds or a plain token bg`);
   const deployDir = flag("--deploy");
   if (deployDir) {
-    const r = deployAssets(path.join(dir, "assets"), assets, path.resolve(deployDir), deck);
-    console.log(`deploy: bg=${r.bg ? "yes" : "no"} logo=${r.logo ? "yes" : "no"} decor=${r.decor} → ${r.dir}`);
+    const r = deployAssets(path.join(dir, "assets"), assets, path.resolve(deployDir), deck, colors);
+    console.log(`deploy: bg=${r.backgrounds} logo=${r.logo ? "yes" : "no"} decor=${r.decor} → ${r.dir}`);
     console.log("deploy: paste the snippets from images/template-assets.md (bg-img / logo / decor-img); the deck MUST use at least one of them");
   }
   console.log("use: paste tokens.css before styles/_base.css; read profile.json for principles and evidence");

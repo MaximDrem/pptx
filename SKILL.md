@@ -147,8 +147,18 @@ Then, **in this order**:
    `images/template-assets.md` with snippets and **placement hints** from the
    template's own slides:
    - `<img class="bg-img" src="images/template-bg…" alt="">` as the FIRST child
-     of every slide that has a background in the template (cover, sections,
-     closings) — or a token bg if the template is flat;
+     of **every slide that has a background in the template** — for corporate
+     templates that is usually most content slides too, not only cover and
+     closing (a copy with the background on two slides reads as a different
+     deck; `lint-deck` errors when the template is image-heavy and backgrounds
+     are missing). The deploy map lists which template slides use which
+     background — match by slide type. A token bg is only for flat templates;
+   - the profile already reproduces the template's content boxes: `--c-surface`
+     holds the template's own card fill (usually a translucent white/black,
+     e.g. `rgba(255,255,255,0.15)`), so plain `.card` looks native. For accent
+     highlights use `.card.tint` (translucent accent); a solid `.card.accent`
+     is for at most ONE short key message per slide — never a wall of filled
+     boxes (probe suggests `accent-cards`);
    - `<img class="logo" src="images/template-logo…" alt="Logo">` in the corner
      where the template keeps it (top-right by default; `.pos-tl`/`.lg`); add
      `with-logo` to the slide class — it reserves the top band for the logo;

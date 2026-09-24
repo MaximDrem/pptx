@@ -87,9 +87,13 @@ function lintDeck(deckPath, opts = {}) {
     // copy that keeps only the boxes leaves the background flat — both were
     // real failures. The profile knows which roles it has.
     let extracted = [];
+    let imageBgTemplate = 0;
+    let templateSlides = 0;
     try {
       const profile = JSON.parse(fs.readFileSync(path.join(stylesDir, profileMatch[2].trim(), "profile.json"), "utf8"));
       extracted = (profile.media && profile.media.extracted) || [];
+      imageBgTemplate = (profile.density && profile.density.imageBackgrounds) || 0;
+      templateSlides = (profile.source && profile.source.slides) || 0;
     } catch {
       extracted = [];
     }
@@ -110,6 +114,17 @@ function lintDeck(deckPath, opts = {}) {
           `Add <img class="bg-img" src="images/template-bg…" alt=""> as the first child of the slides that have it in the template ` +
           `(or set background-image yourself); use a token background only if the template is flat`,
       );
+    }
+    if (hasBg && imageBgTemplate >= Math.max(2, templateSlides * 0.4)) {
+      const deckSlides = (raw.match(/<section\b[^>]*\bclass=(["'])[^"']*\bslide(?![\w-])/g) || []).length;
+      const bgUses = (raw.match(/class=(["'])[^"']*\bbg-img\b/g) || []).length;
+      if (deckSlides > 0 && bgUses < Math.ceil(deckSlides * 0.5)) {
+        errors.push(
+          `template profile «${profileMatch[2].trim()}» paints image backgrounds on most slides (${imageBgTemplate} of ${templateSlides} in the template), ` +
+            `but the deck has only ${bgUses} background layer(s) for ${deckSlides} slides — backgrounds on cover/closing only read as a different deck. ` +
+            `Add .bg-img to every slide that has one in the template (see images/template-assets.md)`,
+        );
+      }
     }
   }
 

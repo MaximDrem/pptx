@@ -311,6 +311,8 @@ structure, the eyes decide taste.
 | `hidden-slide` | the slide is `display:none` or zero-sized — the export engine skips it (a real deck lost 8 of 10 slides this way) | hide slides with `.active` only; never `display:none` |
 | `the deck uses none of the template assets` (lint) | the deck copies a style profile that has assets, but no `<img>` uses them | run `style-profile.cjs <pptx> --deploy <deck-dir>` and paste the `images/template-assets.md` snippets (`bg-img`/`logo`/`decor-img`) |
 | `uses an image background but the deck has none` (lint) | a copy left the background flat | add `<img class="bg-img" …>` on the slides that have it in the template |
+| `accent-cards` | 2+ solid accent cards on one slide | keep one; use `.card.tint` for the other highlights |
+| `uses an image background … backgrounds on most slides` (lint) | background copied only to cover/closing while the template paints most slides | add `.bg-img` to every slide that has one in the template (map in `images/template-assets.md`) |
 | `has decor assets but the deck uses none` (lint) | the background was copied but the template decor ignored — the copy loses its recognisable elements | place **any** deployed decor somewhere sensible (`decor-img`); the map in `images/template-assets.md` is a hint — move/resize/swap decor freely |
 | `missing-br` | two text rows in one box are not separated by `<br>` | add `<br>` between the rows — the export is blocked, PowerPoint would show one line |
 | `no-accent` | a content slide has no emphasis accent | highlight the key card/step/number/table row (see patterns.md, "Accent budget") |
