@@ -116,13 +116,20 @@ async function main() {
     lines.push(`probe: ${result.meta.slideCount} slide(s), stage ${result.meta.stageW}×${result.meta.stageH}`);
     for (const f of result.meta.fontsMissing || []) lines.push(`deck: FONT NOT LOADED: ${f}`);
     let total = 0;
+    let errors = 0;
     for (const r of result.report) {
       for (const issue of r.issues) {
         total++;
-        lines.push(`slide ${r.index + 1}: ${issue.type.toUpperCase()}: ${issue.detail}`);
+        const isError = issue.severity ? issue.severity === "error" : !["empty-region", "tight-gap", "no-accent", "sparse-box"].includes(issue.type);
+        if (isError) errors++;
+        lines.push(`slide ${r.index + 1}: ${isError ? "error" : "suggestion"}: ${issue.type.toUpperCase()}: ${issue.detail}`);
       }
     }
-    lines.push(total === 0 ? "probe: clean" : `probe: ${total} issue(s)`);
+    lines.push(
+      total === 0
+        ? "probe: clean"
+        : `probe: ${errors} error(s), ${total - errors} suggestion(s)` + (errors === 0 ? " (no blocking errors)" : ""),
+    );
 
     if (cmd === "probe") {
       const jsonPath = flag("--json") || path.join(dir, "report.json");
@@ -130,7 +137,7 @@ async function main() {
       lines.push("json: " + jsonPath);
       console.log(lines.join("\n"));
       await page.close();
-      process.exitCode = total === 0 ? 0 : 1;
+      process.exitCode = errors === 0 ? 0 : 1;
       return;
     }
 
@@ -159,7 +166,7 @@ async function main() {
       );
       console.log(lines.join("\n"));
       await page.close();
-      process.exitCode = total === 0 ? 0 : 1;
+      process.exitCode = errors === 0 ? 0 : 1;
       return;
     }
 

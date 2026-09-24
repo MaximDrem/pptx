@@ -198,19 +198,19 @@ svg {
 /* ===== tokens ===== */
 /* Grid Paper — tokens. Order: stage.css → this file → base.css. */
 :root {
-  --stage-bg: #e8e6de;
-  --slide-bg: #fafaf6;
-  --c-bg: #fafaf6;
-  --c-surface: #ffffff;
-  --c-ink: #131519;
-  --c-muted: #57606e;
-  --c-accent: #2e54f6;
-  --c-accent-2: #0e9b6e;
+  --stage-bg: #101114;
+  --slide-bg: #ffffff;
+  --c-bg: #ffffff;
+  --c-surface: #f4f5f7;
+  --c-ink: #0a0a0b;
+  --c-muted: #5b6472;
+  --c-accent: #002fa7;
+  --c-accent-2: #3b5bdb;
   --c-on-accent: #ffffff;
-  --c-line: rgba(19, 21, 25, 0.12);
-  --cover-glow: radial-gradient(120% 95% at 82% -15%, rgba(46, 84, 246, 0.16), transparent 62%),
-    radial-gradient(90% 70% at -8% 108%, rgba(14, 155, 110, 0.1), transparent 58%);
-  --radius: 2px;
+  --c-line: rgba(10, 10, 11, 0.14);
+  --cover-glow: radial-gradient(120% 95% at 84% -18%, rgba(0, 47, 167, 0.12), transparent 62%),
+    radial-gradient(90% 70% at -10% 108%, rgba(59, 91, 219, 0.08), transparent 58%);
+  --radius: 0px;
   --f-display: "Unbounded", Arial, sans-serif;
   --f-body: "Inter", Arial, sans-serif;
   --f-mono: "JetBrains Mono", monospace;
@@ -549,6 +549,41 @@ svg {
   pointer-events: none;
 }
 
+/* ---------------------------------------------------------------- decor
+   Decorative layers for covers/sections/closings. They may bleed past the
+   slide edges: the probe skips `.decor`/`.cover-art` entirely (no
+   out-of-bounds, no content counting). Never put text inside a .decor. */
+.decor { position: absolute; pointer-events: none; }
+.decor.pos-tr { top: -140px; right: -120px; }
+.decor.pos-bl { bottom: -160px; left: -120px; }
+.decor.pos-tl { top: -120px; left: -140px; }
+.decor-blob {
+  width: 520px;
+  height: 520px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, var(--c-accent, #8aa) 0%, transparent 72%);
+  opacity: 0.16;
+}
+.decor-blob.alt { background: radial-gradient(closest-side, var(--c-accent-2, var(--c-accent, #8aa)) 0%, transparent 72%); opacity: 0.14; }
+.decor-ring { width: 430px; height: 430px; border-radius: 50%; border: 2px solid var(--c-line); }
+.decor-dots {
+  width: 280px;
+  height: 280px;
+  background-image: radial-gradient(currentColor 1.5px, transparent 1.6px);
+  background-size: 22px 22px;
+  color: var(--c-line);
+}
+
+/* Template assets: the standard way to reuse a copied deck's background,
+   logo and decor (see style-profile.cjs --deploy). Put .bg-img FIRST inside
+   the slide; .logo usually sits top-right; .decor-img may bleed off-slide. */
+.bg-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+.logo { position: absolute; top: 40px; right: 72px; height: 30px; width: auto; pointer-events: none; }
+.logo.pos-tl { left: 72px; right: auto; }
+.logo.lg { height: 42px; }
+.decor-img { position: absolute; pointer-events: none; }
+.decor-img.pos-br { bottom: -60px; right: -40px; }
+
 /* -------------------------------------------------------------- timeline */
 
 .timeline { display: flex; flex-direction: column; }
@@ -568,7 +603,7 @@ svg {
 .timeline .tl:last-child .rail::before { display: none; }
 .timeline .tl .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--c-accent); margin: 4px auto 0; position: relative; z-index: 1; }
 .timeline .tl .body { padding-bottom: 16px; min-width: 0; }
-.timeline .tl .body h3 { font-size: 15px; font-weight: 600; margin: 0 0 4px; color: var(--c-ink); }
+.timeline .tl .body h3 { font-size: 15px; font-weight: 600; margin: 0 0 9px; color: var(--c-ink); }
 .timeline .tl .body p { font-size: 13.5px; line-height: 1.4; color: var(--c-muted); margin: 0; }
 
 /* --------------------------------------------------------------- charts
@@ -681,6 +716,8 @@ svg {
   <div class="deck-stage" id="deck-stage">
 
     <section class="slide cover" data-role="cover">
+      <div class="cover-art" aria-hidden="true"></div>
+      <div class="decor decor-dots pos-tr"></div>
       <template data-pptx-notes>Открыть одним предложением: офисные артефакты должны создаваться агентом там, где сотрудник уже работает. Дальше — цифры и план.</template>
       <div class="slide-pad">
         <div class="kicker">Команда продукта · Q3 2026</div>
@@ -791,6 +828,8 @@ svg {
     </section>
 
     <section class="slide" data-role="closing">
+      <div class="cover-art" aria-hidden="true"></div>
+      <div class="decor decor-blob pos-bl"></div>
       <template data-pptx-notes>Закончить решением: голосование за два запуска квартала и ответственный по каждому.</template>
       <div class="slide-pad">
         <div class="content center">

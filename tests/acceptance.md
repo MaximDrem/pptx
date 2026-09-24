@@ -143,6 +143,10 @@ Precondition: the integration from `PLAN-integration.md` is done and
   `$GIGATOOL_NODE` the helper exits 2 and prints the
   `read-pptx.cjs --extract-media` fallback.
 - **S14. Template-copy guards (v3)**
+  `--deploy` writes `images/template-assets.md` with per-asset placement hints (template
+  slides + stage-px coordinates; decor = one per slide, up to five). A background-only copy
+  fails lint (`has decor assets but the deck uses none`); any placed decor clears it —
+  the position and the choice of decor are the agent's (unit-covered).
   A deck whose background is a transparent/decor picture → `validate` error
   `decor-as-background`, exit 1 (unit-covered in
   `tests/unit/validate-checks.test.cjs`, case 13); a 6-slide text-only deck →

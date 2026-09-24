@@ -1,18 +1,19 @@
-/* Signal Night — tokens. Order: stage.css → this file → base.css. */
+/* Signal Night — dark Sber variant. Order: stage.css → this file → base.css. */
 :root {
-  --stage-bg: #05070b;
-  --slide-bg: #0a1020;
-  --c-bg: #0a1020;
-  --c-surface: #141d33;
-  --c-ink: #eef3fc;
-  --c-muted: #96a3bb;
-  --c-accent: #5ee0ff;
-  --c-accent-2: #37d399;
-  --c-on-accent: #062430;
-  --c-line: rgba(238, 243, 252, 0.14);
-  --cover-glow: radial-gradient(120% 95% at 80% -15%, rgba(94, 224, 255, 0.2), transparent 62%),
-    radial-gradient(90% 70% at -10% 110%, rgba(55, 211, 153, 0.12), transparent 58%);
-  --radius: 8px;
+  --stage-bg: #05080c;
+  --slide-bg: #0b0f14;
+  --c-bg: #0b0f14;
+  --c-surface: #151c24;
+  --c-ink: #f5f7fa;
+  --c-muted: #9aa6b2;
+  --c-accent: #3ddc7a;
+  --c-accent-2: #0098f8;
+  --c-on-accent: #05230f;
+  --c-line: rgba(245, 247, 250, 0.14);
+  --grad-brand: linear-gradient(115deg, #0098f8 0%, #21a038 55%, #f1e813 100%);
+  --cover-glow: radial-gradient(120% 95% at 80% -15%, rgba(61, 220, 122, 0.18), transparent 62%),
+    radial-gradient(90% 70% at -10% 110%, rgba(0, 152, 248, 0.14), transparent 58%);
+  --radius: 10px;
   --f-display: "Unbounded", Arial, sans-serif;
   --f-body: "Inter", Arial, sans-serif;
   --f-mono: "JetBrains Mono", monospace;

@@ -1,0 +1,23 @@
+/* Sber — the default brand style.
+   Brand gradient (public identity): #0098F8 → #21A038 → #F1E813.
+   Display face: SB Sans is proprietary — Inter is the nearest vendored face. */
+:root {
+  --stage-bg: #e9ecee;
+  --slide-bg: #ffffff;
+  --c-bg: #ffffff;
+  --c-surface: #f2f5f3;
+  --c-ink: #0b0f14;
+  --c-muted: #5a6570;
+  --c-accent: #17812f;
+  --c-accent-2: #0098f8;
+  --c-on-accent: #ffffff;
+  --c-line: rgba(11, 15, 20, 0.12);
+  --grad-brand: linear-gradient(115deg, #0098f8 0%, #21a038 55%, #f1e813 100%);
+  --cover-glow: radial-gradient(120% 95% at 84% -15%, rgba(33, 160, 56, 0.16), transparent 62%),
+    radial-gradient(80% 60% at 102% 108%, rgba(241, 232, 19, 0.14), transparent 60%),
+    radial-gradient(90% 70% at -10% 110%, rgba(0, 152, 248, 0.12), transparent 58%);
+  --radius: 8px;
+  --f-display: "Inter", Arial, sans-serif;
+  --f-body: "Inter", Arial, sans-serif;
+  --f-mono: "JetBrains Mono", monospace;
+}

@@ -165,26 +165,27 @@ function renderDeck(deckPath, opts = {}) {
       // they are still useful when the export was blocked (exit 4).
       const report = readJson(path.join(outDir, "report.json"));
       const inventory = readJson(path.join(outDir, "inventory.json"));
-      // Blocking issues must stop the export even when the app is older than
-      // the skill and did not gate it itself: never deliver a deck with
-      // hidden/clipped/overlapping slides.
+      // Only contract violations block the export. Probe issues carry a
+      // severity; the fallback set keeps older probes safe.
       const BLOCKING = new Set([
         "text-clip",
         "out-of-bounds",
         "text-overlap",
         "low-contrast",
         "blank",
+        "maybe-blank",
         "broken-image",
         "stage-broken",
         "probe-error",
         "hidden-slide",
         "missing-br",
       ]);
+      const isBlocking = (i) => (i.severity ? i.severity === "error" : BLOCKING.has(i.type));
       let effectiveCode = finalCode;
       if (finalCode === 0 && (opts.pptx || opts.pdf) && report) {
-        const blocking = (report.slides || []).reduce((n, s) => n + (s.issues || []).filter((i) => BLOCKING.has(i.type)).length, 0);
+        const blocking = (report.slides || []).reduce((n, s) => n + (s.issues || []).filter(isBlocking).length, 0);
         if (blocking > 0) {
-          console.error(`render: ${blocking} blocking issue(s) — export skipped (fix deck.html and re-run; the .pptx is not delivered)`);
+          console.error(`render: ${blocking} blocking error(s) — export skipped (fix deck.html and re-run; the .pptx is not delivered)`);
           effectiveCode = 4;
         }
       }

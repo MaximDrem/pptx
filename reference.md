@@ -115,7 +115,7 @@ When to use what:
 ## style-profile.cjs — style profile from a .pptx
 
 ```bash
-... style-profile.cjs deck.pptx --name "Name" [--slug slug] [--assets key|all|none] [--max-assets N]
+... style-profile.cjs deck.pptx --name "Name" [--slug slug] [--assets key|all|none] [--max-assets N] [--deploy <deck-dir>]
 ```
 
 Creates `~/.wsc/config/styles/<slug>/` (outside the skill folder — survives
@@ -123,14 +123,30 @@ skill updates):
 
 - `profile.json` — the evidence base: theme, tokens, fonts, histograms,
   density, principles, list of extracted media;
-- `tokens.css` — a ready `:root` to paste into a deck;
+- `tokens.css` — a ready `:root` to paste into a deck (referenced from the deck
+  as `<style data-presentation-style="profile:<slug>">`);
 - `assets/` — background/decorative files the style relied on.
 
-How to use it in a new deck: copy `tokens.css` after `stage.css` and before
-`styles/_base.css`; pictures — from `assets/` (place them next to deck.html and
-reference with `<img src="...">`, then `index.cjs` inlines them). Fonts: if the
-profile has a proprietary face, substitute the nearest vendored one (Inter /
-Source Serif 4 / Unbounded / JetBrains Mono) and tell the user about the
+With `--deploy <deck-dir>` the role-key art is also copied next to the deck as
+`images/template-bg.<ext>`, `images/template-logo.<ext>`,
+`images/template-decor-N.<ext>` and `images/template-assets.md` is written with
+paste-ready snippets:
+
+```html
+<img class="bg-img" src="images/template-bg.png" alt="">      <!-- first child of the slide -->
+<img class="logo" src="images/template-logo.png" alt="Logo">   <!-- top-right; .pos-tl/.lg -->
+<img class="decor-img pos-tr" src="images/template-decor-1.png" alt="">
+```
+
+`lint-deck` fails a profile-styled deck that uses none of the profile assets
+(if the profile has any) — that is what makes a copy recognizable. A
+template-assets.md saying the style is flat/token-only is the only excuse.
+
+How to use the profile in a new deck: reference it in the managed style block
+(`profile:<slug>`), use the deployed art as above, then `index.cjs` inlines the
+images. Fonts: if the profile has a proprietary face, substitute the nearest
+vendored one (Inter / Source Serif 4 / Unbounded / JetBrains Mono) and tell the
+user about the
 substitution.
 
 ## One-box rule (editable .pptx)
@@ -169,6 +185,9 @@ Two levels in one report:
 |---|---|
 | `empty-slide` | the slide has no elements at all in the .pptx — it fell out of the export (check `display:none` / `.active`) |
 | `decor-as-background` | a transparent/decor/logo picture is stretched as a full-slide background (real incident: the template's cat decor became the final slide's background) | backgrounds come from `[background]`-role media or a token; decor stays decor |
+| `accent-heading` | a heading is painted in the accent color | headings stay ink; only section dividers use accent (probe error) |
+| `accent-overload` | an accent-filled surface covers >40% of the slide (the acid "slab") | keep accent to badges, numbers, one short card; content blocks use surface (probe error) |
+| `plain-cover` | the cover has no visual layer at all | add `cover-art`, decor, a logo or the template background |
 | `empty-placeholder` | a filled placeholder with no text or content |
 | `split-box` | "backdrop + separate textbox" (text not written as runs in the box) |
 | `contrast` | run contrast: error < 3.0 (WCAG AA large text), warning < 4.5 (WCAG AA body); inheritance-aware and blending translucent fills |
@@ -218,7 +237,7 @@ calls it automatically after `--pptx`.
 The deck declares one managed block:
 
 ```html
-<style data-presentation-style="signal-night"></style>
+<style data-presentation-style="sber"></style>
 ```
 
 The helper replaces its content in place with `stage.css` + `fonts/fonts.css`
@@ -250,9 +269,11 @@ Exit: 0 — clean; 1 — lint/assets/styles errors; 2 — render did not start;
 3 — render crashed; **4 — blocking layout issues: the export was skipped and
 no .pptx was produced**. Non-blocking issues are lines to fix, not failures.
 
-Blocking issue types: `text-clip`, `out-of-bounds`, `text-overlap`,
-`low-contrast`, `blank`, `broken-image`, `stage-broken`, `probe-error`,
-`hidden-slide`, `missing-br`.
+Blocking `error` types: `text-clip`, `out-of-bounds` (content, not decor),
+`text-overlap`, `low-contrast`, `blank`/`maybe-blank`, `broken-image`,
+`stage-broken`, `probe-error`, `hidden-slide`, `missing-br`. Everything else
+(`empty-region`, `tight-gap`, `no-accent`, `sparse-box`, `accent-*`,
+`plain-cover`, `img-no-alt`) is a `suggestion` — it never blocks the export.
 
 ## render.cjs — a standalone render run
 
@@ -269,7 +290,10 @@ watchdog.
 
 ## report.json — layout issues
 
-Format: `{ "slides": [{ "index": 0, "issues": [{ "type": "...", "detail": "..." }] }] }`.
+Format: `{ "slides": [{ "index": 0, "issues": [{ "type": "...", "detail": "...", "severity": "error|warning" }] }] }`.
+`error` = contract violation (blocks the export, exit 4); `warning` = a
+suggestion for the model to judge visually. SOTA-style split: tools gate
+structure, the eyes decide taste.
 
 | Type | Meaning | How to fix |
 |---|---|---|
@@ -282,6 +306,8 @@ Format: `{ "slides": [{ "index": 0, "issues": [{ "type": "...", "detail": "..." 
 | `broken-image` | the image failed to render | check the path, run `assets.cjs` |
 | `img-no-alt` | an `<img>` has no `alt` attribute | add alt text (empty `alt=""` for decoration) |
 | `hidden-slide` | the slide is `display:none` or zero-sized — the export engine skips it (a real deck lost 8 of 10 slides this way) | hide slides with `.active` only; never `display:none` |
+| `the deck uses none of the template assets` (lint) | the deck copies a style profile that has assets, but no `<img>` uses them | run `style-profile.cjs <pptx> --deploy <deck-dir>` and paste the `images/template-assets.md` snippets (`bg-img`/`logo`/`decor-img`) |
+| `has decor assets but the deck uses none` (lint) | the background was copied but the template decor ignored — the copy loses its recognisable elements | place **any** deployed decor somewhere sensible (`decor-img`); the map in `images/template-assets.md` is a hint — move/resize/swap decor freely |
 | `missing-br` | two text rows in one box are not separated by `<br>` | add `<br>` between the rows — the export is blocked, PowerPoint would show one line |
 | `no-accent` | a content slide has no emphasis accent | highlight the key card/step/number/table row (see patterns.md, "Accent budget") |
 | `sparse-box` | a box taller than 180px is filled with text by less than 38% | shorten the box or add substance (see patterns.md, "Box fill") |

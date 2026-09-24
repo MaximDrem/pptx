@@ -116,6 +116,18 @@ async function main() {
     record("probe: декор за краями слайда не ловится", /probe: clean/.test(decout), decout.includes("clean") ? "ok" : decout.split("\n").slice(1, 3).join(" | "));
   }
 
+  // 2g. Акцентный заголовок и акцентная плита — ловятся.
+  {
+    const amDeck = assemble("accent-misuse-body.html");
+    const amrun = runHarness(["probe", amDeck]);
+    const amout = (amrun.stdout || "") + (amrun.stderr || "");
+    record(
+      "probe: злоупотребление акцентом ловится",
+      /ACCENT-HEADING/.test(amout) && /ACCENT-OVERLOAD/.test(amout),
+      amout.includes("ACCENT-HEADING") && amout.includes("ACCENT-OVERLOAD") ? "ok" : "not reported",
+    );
+  }
+
   // 3. defect fixture: every issue type must fire.
   const defect = assemble("defect-body.html");
   const defectRun = runHarness(["probe", defect]);
@@ -248,9 +260,12 @@ async function main() {
       const JSZip = require(path.join(SKILL, "vendor", "jszip.bundle.cjs"));
       const zip = await JSZip.loadAsync(fs.readFileSync(patOut));
       const xml = await zip.file("ppt/slides/slide7.xml").async("string");
-      const merged = (xml.match(/<p:sp>[\s\S]*?<\/p:sp>/g) || []).filter(
-        (s2) => /roundRect/.test(s2) && /<p:txBody>/.test(s2) && /<a:t>/.test(s2),
-      ).length;
+      // A merged box = one shape that has BOTH a fill (in spPr) and text runs —
+      // the radius differs per style (roundRect vs rect), so don't rely on it.
+      const merged = (xml.match(/<p:sp>[\s\S]*?<\/p:sp>/g) || []).filter((s2) => {
+        const spPr = (/<p:spPr>[\s\S]*?<\/p:spPr>/.exec(s2) || [""])[0];
+        return /<a:prstGeom prst="(?:roundRect|rect)"/.test(spPr) && /<(?:a:solidFill|a:gradFill)/.test(spPr) && /<p:txBody>[\s\S]*<a:t>/.test(s2);
+      }).length;
       record("flow-узлы склеиваются в одну фигуру (слайд 7 patterns)", merged === 3, `merged=${merged}`);
     }
   }

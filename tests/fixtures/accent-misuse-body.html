@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="ru">
+<head><meta charset="utf-8"><title>accent-misuse fixture</title>
+<style>
+{{CSS}}
+.slab { background: var(--c-accent); color: var(--c-on-accent); position: absolute; left: 0; top: 300px; width: 1280px; height: 380px; padding: 24px; }
+.hl-accent { color: var(--c-accent) !important; }
+</style></head>
+<body>
+<div class="deck-viewport"><div class="deck-stage" id="deck-stage">
+  <section class="slide" data-role="content">
+    <div class="slide-pad">
+      <div class="slide-head">
+        <div class="kicker">Проверка</div>
+        <h2 class="headline wide hl-accent">Заголовок в акцентном цвете</h2>
+      </div>
+      <div class="content">
+        <div class="card"><span class="t-body">Обычный текст обычной карточки, чтобы слайд не был пустым.</span></div>
+      </div>
+      <div class="slab"><span class="t-body">Акцентная плита вместо контента — так делать нельзя.</span></div>
+      <div class="footer"><span>Проверка</span><span>01</span></div>
+    </div>
+  </section>
+</div></div>
+</body>
+</html>

@@ -47,4 +47,51 @@ const bypass = lintDeck(file, { quiet: true });
 delete process.env.GIGATOOL_DECK_LINT;
 assert.ok(bypass.errors.length > 0, "GIGATOOL_DECK_LINT=0 must not disable lint anymore");
 
-console.log("PASS  lint-deck: //host и file: ловятся, bypass удалён");
+// Template fidelity: a profile with assets but a deck that uses none → error.
+{
+  const stylesDir = fs.mkdtempSync(path.join(os.tmpdir(), "presentation-v3-styles-"));
+  const profileDir = path.join(stylesDir, "brand");
+  fs.mkdirSync(path.join(profileDir, "assets"), { recursive: true });
+  fs.writeFileSync(path.join(profileDir, "assets", "logo.png"), "not-a-real-png");
+  fs.writeFileSync(path.join(profileDir, "assets", "cat.png"), "not-a-real-png");
+  fs.writeFileSync(
+    path.join(profileDir, "profile.json"),
+    JSON.stringify({ media: { extracted: [{ name: "logo.png", role: "logo" }, { name: "cat.png", role: "decor" }] } }),
+  );
+  const deck = path.join(dir, "template.deck.html");
+  fs.writeFileSync(
+    deck,
+    `<!doctype html><html><head>
+<style data-presentation-style="profile:brand"></style>
+<style>.slide { color: red; }</style>
+</head><body><div class="deck-viewport"><div class="deck-stage" id="deck-stage">
+<section class="slide" data-role="content"><div class="slide-pad">Только текст</div></section>
+</div></div></body></html>`,
+  );
+  process.env.PRESENTATION_STYLES_DIR = stylesDir;
+  const noAssetsUsed = lintDeck(deck, { quiet: true });
+  assert.ok(
+    noAssetsUsed.errors.join("\n").includes("has assets but the deck uses none"),
+    "profile with assets + text-only deck must be an error",
+  );
+
+  // Background only: the "any image" rule is satisfied, but the decor rule is not.
+  const bgOnly = fs
+    .readFileSync(deck, "utf8")
+    .replace("Только текст", '<img class="bg-img" src="images/template-bg.png" alt="">');
+  fs.writeFileSync(deck, bgOnly);
+  const bgOnlyRes = lintDeck(deck, { quiet: true });
+  assert.ok(
+    bgOnlyRes.errors.join("\n").includes("has decor assets but the deck uses none"),
+    "background-only copy must fail the decor rule",
+  );
+
+  // Adding one decor clears both errors.
+  const withDecor = bgOnly.replace("</section>", '<img class="decor-img" style="left:900px; top:-120px; width:380px" src="images/template-decor-1.png" alt=""></section>');
+  fs.writeFileSync(deck, withDecor);
+  const fixed = lintDeck(deck, { quiet: true });
+  delete process.env.PRESENTATION_STYLES_DIR;
+  assert.ok(!fixed.errors.join("\n").includes("template profile"), "using bg + decor must clear the template errors");
+}
+
+console.log("PASS  lint-deck: //host и file: ловятся, bypass удалён, шаблонные ассеты обязательны");

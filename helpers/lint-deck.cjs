@@ -63,6 +63,45 @@ function lintDeck(deckPath, opts = {}) {
     );
   }
 
+  // 0b. Template fidelity: if the deck copies a saved style profile that has
+  //     assets, the deck must actually use at least one of them (real runs
+  //     copied only the tokens and lost every element of the original).
+  const profileMatch = /data-presentation-style=(["'])profile:([^"']+)\1/.exec(raw);
+  if (profileMatch) {
+    const stylesDir = process.env.PRESENTATION_STYLES_DIR || path.join(os.homedir(), ".wsc", "config", "styles");
+    const assetsDir = path.join(stylesDir, profileMatch[2].trim(), "assets");
+    let hasAssets = false;
+    try {
+      hasAssets = fs.readdirSync(assetsDir).some((f) => /\.(png|jpe?g|svg|webp)$/i.test(f));
+    } catch {
+      hasAssets = false;
+    }
+    const imgCount = (raw.match(/<img\b/gi) || []).length;
+    if (hasAssets && imgCount === 0) {
+      errors.push(
+        `template profile «${profileMatch[2].trim()}» has assets but the deck uses none — reuse the template's background/logo/decor: ` +
+          `run style-profile.cjs <template.pptx> --name "…" --deploy <this deck's folder> and paste the snippets from images/template-assets.md`,
+      );
+    }
+    // A copy that keeps only the background loses the recognisable decor — the
+    // template profile knows it has decor, so at least one must be placed.
+    let hasDecor = false;
+    try {
+      const profile = JSON.parse(fs.readFileSync(path.join(stylesDir, profileMatch[2].trim(), "profile.json"), "utf8"));
+      hasDecor = ((profile.media && profile.media.extracted) || []).some((a) => a.role === "decor");
+    } catch {
+      hasDecor = false;
+    }
+    const usesDecor = /class=(["'])[^"']*\b(?:decor|decor-img)\b/.test(raw);
+    if (hasDecor && !usesDecor) {
+      errors.push(
+        `template profile «${profileMatch[2].trim()}» has decor assets but the deck uses none — the copy loses the original's recognisable elements. ` +
+          `Place at least one deployed decor anywhere sensible (class="decor-img", see images/template-assets.md for hints); ` +
+          `position, size and the choice of decor are yours`,
+      );
+    }
+  }
+
   // 1. Offline contract.
   const external = new Set();
   let m;

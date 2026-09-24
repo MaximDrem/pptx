@@ -253,22 +253,32 @@ async function run(
     // Blocking layout issues stop the export: a deck with hidden, clipped or
     // overlapping slides must be fixed first. Exit 4 — the .pptx is not
     // produced at all, so an empty/broken deck cannot be delivered.
+    // Only contract violations block the export: probe marks each issue with a
+    // severity (errors = structural correctness, warnings = taste hints that
+    // the model reviews visually). The fallback set keeps older probes safe.
     const BLOCKING = new Set([
       "text-clip",
       "out-of-bounds",
       "text-overlap",
       "low-contrast",
       "blank",
+      "maybe-blank",
       "broken-image",
       "stage-broken",
       "probe-error",
       "hidden-slide",
       "missing-br",
     ])
+    const isBlocking = (i: { type: string; severity?: string }) => (i.severity ? i.severity === "error" : BLOCKING.has(i.type))
+    const countBy = (fn: (i: { type: string; severity?: string }) => boolean) =>
+      domReports.reduce((n, r) => n + (r.issues ?? []).filter(fn).length, 0)
     if (opts.pptx || opts.pdf) {
-      const blocking = domReports.reduce((n, r) => n + (r.issues ?? []).filter((i) => BLOCKING.has(i.type)).length, 0)
+      const blocking = countBy(isBlocking)
+      const suggestions = countBy((i) => !isBlocking(i))
       if (blocking > 0) {
-        console.log(`render: ${blocking} blocking issue(s) — export skipped. Fix deck.html and re-run; export only after a clean render.`)
+        console.log(
+          `render: ${blocking} blocking error(s), ${suggestions} suggestion(s) — export skipped. Fix deck.html and re-run; export only after a clean render.`,
+        )
         exit(4)
       }
     }
@@ -310,6 +320,8 @@ async function run(
     }
 
     const totalIssues = domReports.reduce((n, r) => n + (r.issues?.length ?? 0), 0)
+    const errorCount = countBy(isBlocking)
+    const suggestionCount = totalIssues - errorCount
     const label: Record<string, string> = {
       "text-clip": "TEXT CLIPPED",
       "out-of-bounds": "OUT OF BOUNDS",
@@ -321,19 +333,29 @@ async function run(
       "text-overlap": "TEXT OVERLAP",
       "stage-broken": "STAGE BROKEN",
       "probe-error": "PROBE ERROR",
+      "hidden-slide": "HIDDEN SLIDE",
+      "missing-br": "MISSING BR",
+      "no-accent": "NO ACCENT",
+      "accent-heading": "ACCENT HEADING",
+      "accent-overload": "ACCENT OVERLOAD",
+      "plain-cover": "PLAIN COVER",
+      "sparse-box": "SPARSE BOX",
+      "tight-gap": "TIGHT GAP",
+      "img-no-alt": "IMG NO ALT",
     }
     for (const report of domReports) {
       for (const issue of report.issues) {
-        console.log(`slide ${report.index + 1}: ${label[issue.type] ?? issue.type.toUpperCase()}: ${issue.detail}`)
+        const kind = isBlocking(issue) ? "error" : "suggestion"
+        console.log(`slide ${report.index + 1}: ${kind}: ${label[issue.type] ?? issue.type.toUpperCase()}: ${issue.detail}`)
       }
     }
     console.log(`render: ${meta.slideCount} slide(s) → ${opts.outDir}`)
     console.log(`report: ${reportPath}`)
     console.log(`inventory: ${inventoryPath}`)
     console.log(
-      totalIssues === 0
-        ? "render: clean — no layout issues detected"
-        : `render: ${totalIssues} issue(s) — fix deck.html, re-run render.cjs, then render again`,
+      errorCount === 0
+        ? `render: clean — no blocking errors${suggestionCount ? ` (${suggestionCount} suggestion(s) to review visually)` : ""}`
+        : `render: ${errorCount} blocking error(s), ${suggestionCount} suggestion(s) — fix deck.html, re-run, then render again`,
     )
     exit(0)
   } catch (e) {

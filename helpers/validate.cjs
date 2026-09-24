@@ -252,9 +252,16 @@ function checkDeck(deck) {
       if (wPx < slidePx.w * 0.85 || hPx < slidePx.h * 0.85) continue;
       const m = mediaByName.get(el.media);
       if (!m) continue;
+      const v = m.visual || {};
+      const renderedAspect = wPx / Math.max(1, hPx);
+      const naturalAspect = v.aspect || (v.width && v.height ? v.width / v.height : null);
+      const stretched = naturalAspect ? Math.abs(naturalAspect - renderedAspect) / renderedAspect > 0.2 : false;
       const why = [];
       if (m.role === "decor" || m.role === "logo") why.push(`role=${m.role}`);
-      if (m.visual && m.visual.hasAlpha) why.push("прозрачный PNG");
+      // A transparent PNG used full-slide is normally decor — but a gradient
+      // background with alpha is legitimate, so only flag it when it is also
+      // visibly stretched off its natural aspect.
+      else if (v.hasAlpha && stretched) why.push("прозрачный PNG растянут не по пропорции");
       if (why.length) {
         errors.push({
           slide: slide.index,
@@ -513,20 +520,22 @@ function mergeHtmlReport(rep, out) {
     for (const issue of slide.issues || []) {
       n++;
       const detail = `слайд ${slide.index + 1}: ${issue.type}: ${issue.detail}`;
-      if (
-        [
-          "text-clip",
-          "out-of-bounds",
-          "text-overlap",
-          "low-contrast",
-          "blank",
-          "broken-image",
-          "stage-broken",
-          "probe-error",
-          "hidden-slide",
-          "missing-br",
-        ].includes(issue.type)
-      ) {
+      const isError = issue.severity
+        ? issue.severity === "error"
+        : [
+            "text-clip",
+            "out-of-bounds",
+            "text-overlap",
+            "low-contrast",
+            "blank",
+            "maybe-blank",
+            "broken-image",
+            "stage-broken",
+            "probe-error",
+            "hidden-slide",
+            "missing-br",
+          ].includes(issue.type);
+      if (isError) {
         out.errors.push({ slide: slide.index + 1, check: "html:" + issue.type, detail });
       } else {
         out.warnings.push({ slide: slide.index + 1, check: "html:" + issue.type, detail });

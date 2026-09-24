@@ -32,7 +32,7 @@ Each of these has already broken a real deck. They are not style advice.
    slides that way. The probe reports `hidden-slide` and the export is blocked.
 4. **Never write the base CSS yourself.**
    The skeleton has one managed block —
-   `<style data-presentation-style="signal-night"></style>` — and the builder
+   `<style data-presentation-style="sber"></style>` — and the builder
    installs `stage.css` + `fonts/fonts.css` + `tokens.css` + `styles/_base.css`
    into it on every run. Your own CSS goes into a separate `<style>` after it,
    only for what the patterns do not cover. Hand-copied CSS drifts from the
@@ -41,10 +41,14 @@ Each of these has already broken a real deck. They are not style advice.
    Open `patterns.md` and `examples/example-deck.html` first: slides and blocks
    come from there. Do not invent a layout while a verified pattern exists.
 6. **The render/validate loops are gates, not advice.**
-   `index.cjs deck.html --pptx` refuses to export while there are blocking
-   layout issues (exit 4, no `.pptx` is produced). `validate.cjs` errors block
-   delivery. Every content slide must have `elements > 0` and `coverage > 0` in
-   `inventory.json`. There is no "deliver anyway".
+   `index.cjs deck.html --pptx` refuses to export while there are **blocking
+   errors** (exit 4, no `.pptx` is produced). Blocking = broken layout: clipped
+   text, out-of-bounds content, overlaps, invisible contrast, blank or hidden
+   slides, broken images, rows without `<br>`. Everything else the probe prints
+   is a **suggestion** (accents, spacing, emptiness, decor) — review them with
+   your eyes, fix what genuinely improves the deck, mention the rest. Every
+   content slide must have `elements > 0` and `coverage > 0` in
+   `inventory.json`. There is no "deliver anyway" for blocking errors.
 7. **Look before you copy, look before you deliver (vision).**
    When a template .pptx is attached, render its slides with
    `helpers/shots.cjs` and READ the images before extracting a style. The
@@ -97,12 +101,17 @@ understand the goal and the length.
 
 ### 1A. Pick a built-in style
 
-`styles/index.json`: `grid-paper` (product/analytics), `ink-press`
-(reports/stories), `signal-night` (strategy/pitch). Pick by content type
-without asking; if the user named a style, use it:
+**Default: `sber`** — the brand style (white canvas, Sber gradient
+#0098F8 → #21A038 → #F1E813 in accents and chart fills, Inter in place of the
+proprietary SB Sans). Use it unless the content clearly asks for something
+else. Alternatives in `styles/index.json`: `signal-night` (dark brand variant
+for pitch/strategy), `grid-paper` (neutral IKB when the deck is not
+Sber-related), `ink-press` (warm editorial for stories/reports). Pick by
+content type without asking; if the user named a style, use it. Never mix two
+palettes in one deck.
 
 ```html
-<style data-presentation-style="signal-night"></style>
+<style data-presentation-style="sber"></style>
 ```
 
 ### 1B. Copy the style of an attached deck (with your eyes)
@@ -114,8 +123,8 @@ a decorative cat stretched as a background. The workflow:
 # 1) See the template first: per-slide PNGs + a text digest
 ... shots.cjs "<attached.pptx>" --out-dir /tmp/tpl-shots --keep
 
-# 2) Extract tokens/assets + the media inventory
-... style-profile.cjs "<attached.pptx>" --name "Style name"
+# 2) Extract tokens + assets AND deploy the key art next to the deck
+... style-profile.cjs "<attached.pptx>" --name "Style name" --deploy .
 ```
 
 Then, **in this order**:
@@ -132,14 +141,32 @@ Then, **in this order**:
 3. Note the palette by looking: dominant color, accent, whether the deck is
    dark or light. Compare with the extracted `tokens.css`; if they disagree,
    trust what you SEE and fix the tokens (bg/ink/accent) by hand.
-4. Build the deck with `data-presentation-style="profile:<slug>"`, copy the
-   chosen assets next to `deck.html` (`images/…`), reference them as
-   `<img>`/backgrounds. Keep the template's dark/light decision on EVERY
-   slide — do not switch some slides to a flat color "for variety" (that is
-   how the blue slides happened).
-5. Verify against the reference: put a template shot next to your render of
-   the same kind of slide. If they feel like different decks, fix tokens or
-   backgrounds before delivering.
+4. **Use the deployed template art** — this is what makes the copy recognizable
+   (skipping it is how a "copy" ends up with zero elements of the original):
+   `--deploy` copied the background/logo/decor into `images/` and wrote
+   `images/template-assets.md` with snippets and **placement hints** from the
+   template's own slides:
+   - `<img class="bg-img" src="images/template-bg…" alt="">` as the FIRST child
+     of every slide that has a background in the template (cover, sections,
+     closings) — or a token bg if the template is flat;
+   - `<img class="logo" src="images/template-logo…" alt="Logo">` in the corner
+     where the template keeps it (top-right by default; `.pos-tl`/`.lg`); add
+     `with-logo` to the slide class — it reserves the top band for the logo;
+   - `<img class="decor-img" src="images/template-decor-…" alt="">` for the
+     template's illustrations. The map's coordinates are HINTS, not a
+     mandate: move, resize, mirror or bleed the decor, swap in another
+     deployed decor, or borrow a motif from another template slide — as long
+     as (a) at least one template decor element is used and (b) decor never
+     collides with text (the probe errors on overlap) and never becomes a
+     full-slide background.
+   If `template-assets.md` says the template has no reusable art (a flat
+   token-only style), say so and move on.
+5. Build the deck with `data-presentation-style="profile:<slug>"`. Keep the
+   template's dark/light decision on EVERY slide — do not switch some slides
+   to a flat fill "for variety" (that is how the blue slides happened).
+6. Verify against the reference: put a template shot next to your render of
+   the same kind of slide. If they feel like different decks, fix tokens,
+   backgrounds or the deployed art before delivering.
 
 ### 1C. Rework someone else's .pptx
 
@@ -173,7 +200,7 @@ wholesale: its working copy carries expanded CSS that you must not paste.
 <head>
 <meta charset="utf-8">
 <title>Title</title>
-<style data-presentation-style="signal-night"></style>
+<style data-presentation-style="sber"></style>
 <style>/* optional: only what the patterns do not cover */</style>
 </head>
 <body>
@@ -204,6 +231,11 @@ Markup rules:
   row). More than one is fine when the layout expresses real hierarchy; do not
   accent everything equally. Kicker/footer/soft badges do not count (probe
   warns `no-accent`);
+- **accent discipline**: accent is produced with SMALL elements — badges,
+  icons, numbers, one short card (≤2 lines), a highlighted row. Headings stay
+  ink (only section dividers are accent); never paint a content block with
+  accent — a surface over 40% of the slide is a slab, not an accent
+  (suggestions `accent-heading` / `accent-overload`);
 - **visual anchor**: every content slide has something to look at — a Lucide
   icon, a chart, a photo or a big number. A deck of text-only cards reads as
   empty even when the text is there (probe: `sparse-box`, validate:
@@ -233,20 +265,21 @@ Markup rules:
 ```
 
 `review.cjs` renders the deck, prints every `slide-NN.png` to look at, lists
-the probe issues, runs the artifact validator if a .pptx already exists, and
-prints the review checklist. The loop is:
+the probe findings, runs the artifact validator if a .pptx already exists, and
+prints the review checklist. Findings are printed as `error:` (blocking — must
+be fixed) or `suggestion:` (taste — judge visually). The loop is:
 
 1. **review** — run the command;
 2. **look** — READ every printed PNG (vision). For a 10-slide deck that is 10
    images; do not skip dense slides or the cover/closing;
-3. **fix** — edit `deck.html` per the checklist and the probe lines;
-4. **repeat** until `render: clean` AND your eyes agree.
+3. **fix** — fix every `error:` line first, then the suggestions that make the
+   deck visibly better;
+4. **repeat** until there are no `error:` lines AND your eyes agree.
 
-Fix probe blockers first (`TEXT-CLIPPED`, `OUT-OF-BOUNDS`, `TEXT-OVERLAP`,
-`LOW-CONTRAST`, `BLANK`, `BROKEN-IMAGE`, `HIDDEN-SLIDE`, `MISSING-BR`), then
-the taste issues (`EMPTY-REGION`, `SPARSE-BOX`, `NO-ACCENT`, `TIGHT-GAP`).
-While the render is not clean, do not build the .pptx: the tool refuses
-anyway (exit 4).
+Taste suggestions you intentionally leave (a deliberate wide spacing, an
+unaccented quote slide) do not need fixing — but say in your reply which
+suggestions you left and why. Do not build the .pptx while errors remain: the
+tool refuses anyway (exit 4).
 
 If you cannot view images in this environment, say so explicitly and rely on
 the probe lines + `inventory.json` (`coverage` > 0 on every content slide).
@@ -289,7 +322,12 @@ verify estimated numbers, and on "fix slide N" — edit `deck.html`, rebuild.
 - no emoji, external URLs, CDNs;
 - no `display:none` on slides;
 - never change `stage.css`;
+- never paint headings in the accent color and never use accent as a
+  content-block background;
 - never use decor/logo media as a slide background;
+- a template copy must reuse at least one template asset (background, logo or
+  decor) whenever the profile has any — a "copy" with zero original elements
+  is a failed copy;
 - do not "fix" overflow by shrinking the font;
 - do not delete `deck.html` after export.
 

@@ -219,6 +219,7 @@ function pickAssets(deck, mode) {
     let s = roleScore[m.role] || 0;
     if (m.kind === "vector") s += 40;
     if (m.usedAsBackground) s += 30;
+    if (m.usedBySlides.length) s += 25; // visible art beats layout-only art
     if (m.usedBySlides.length >= 2) s += 15;
     if (m.visual && m.visual.hasAlpha) s += 5;
     if (/logo|icon|decor|mark/i.test(m.name)) s += 5;
@@ -229,7 +230,26 @@ function pickAssets(deck, mode) {
     .filter((m) => m.usedBySlides.length || (m.usedByParts && m.usedByParts.length))
     .sort((a, b) => score(b) - score(a));
   const cap = mode === "all" ? 64 : 8;
-  return TOP(ranked, cap).filter((m) => !(mode === "key" && ["emf", "wmf", "wdp"].includes(m.ext)));
+  if (mode === "all") return TOP(ranked, cap).filter((m) => !["emf", "wmf", "wdp"].includes(m.ext));
+  // Key mode: quotas per role — a "style copy" without the template's logo,
+  // decor or photo is not a copy (real incident: only backgrounds came out).
+  const quotas = { background: 2, logo: 1, decor: 3, photo: 1 };
+  const out = [];
+  const used = new Set();
+  const take = (m) => {
+    if (m && !used.has(m.name)) {
+      used.add(m.name);
+      out.push(m);
+    }
+  };
+  for (const [role, n] of Object.entries(quotas)) {
+    ranked.filter((m) => m.role === role).slice(0, n).forEach(take);
+  }
+  for (const m of ranked) {
+    if (out.length >= cap) break;
+    take(m);
+  }
+  return out.filter((m) => !["emf", "wmf", "wdp"].includes(m.ext)).slice(0, cap);
 }
 
 async function extractAssets(deckFile, mediaList, dir) {
@@ -252,6 +272,139 @@ async function extractAssets(deckFile, mediaList, dir) {
     });
   }
   return written;
+}
+
+// --deploy: copy the template's key art next to the deck and write paste-ready
+// snippets + a PLACEMENT MAP from the source deck (which template slide uses
+// the asset and at what stage-px coordinates). This exists because real runs
+// copied only tokens (or only a background) and lost the template's decor.
+function deployAssets(assetsDir, written, deckDir, deck) {
+  const images = path.join(deckDir, "images");
+  fs.mkdirSync(images, { recursive: true });
+  const pick = (role, n = 1) => written.filter((a) => a.role === role).slice(0, n);
+  const bg = pick("background", 1)[0];
+  const logo = pick("logo", 1)[0];
+  // Decor: only art that is actually visible — placed on slides first; a
+  // layout-only decor is a hint (and orphan layouts must not be deployed at
+  // all: a real template kept colourful art in an unused layout). Take at most
+  // one decor per template slide so the deck gets a menu, not one slide's set.
+  const decorAll = written.filter((a) => a.role === "decor");
+  const decorOnSlides = decorAll.filter((a) => a.usedBySlides && a.usedBySlides.length);
+  const byFirstSlide = new Map();
+  for (const a of decorOnSlides) {
+    const key = a.usedBySlides[0];
+    if (!byFirstSlide.has(key)) byFirstSlide.set(key, a);
+  }
+  const decor = (decorOnSlides.length ? [...byFirstSlide.values()] : decorAll).slice(0, 5);
+  const lines = ["# Template assets — snippets and placement map", ""];
+
+  const walk = (els, out) => {
+    for (const el of els || []) {
+      if (el.media) out.push(el);
+      if (el.children) walk(el.children, out);
+    }
+    return out;
+  };
+  const usage = (name) => {
+    const rows = [];
+    for (const s of (deck && deck.slides) || []) {
+      for (const el of walk(s.elements, [])) {
+        if (el.media !== name) continue;
+        const px = el.box && el.box.px;
+        if (!px) continue;
+        rows.push({ slide: (s.index ?? rows.length) + 1, x: Math.round(px.x), y: Math.round(px.y), w: Math.round(px.w), h: Math.round(px.h) });
+      }
+    }
+    return rows;
+  };
+  const layoutSlides = (name) => {
+    const m = ((deck && deck.media) || []).find((x) => x.name === name);
+    if (!m || !m.usedByParts) return [];
+    const parts = new Set(m.usedByParts.map((p) => p.replace("/_rels/", "/")));
+    return ((deck && deck.slides) || [])
+      .filter((s) => parts.has(s.layout) || parts.has(s.master))
+      .map((s) => (s.index ?? 0) + 1);
+  };
+  const bgSlides = (name) => ((deck && deck.slides) || []).filter((s) => s.effectiveBg && s.effectiveBg.media === name).map((s) => (s.index ?? 0) + 1);
+  const fmt = (rows, max = 4) =>
+    rows
+      .slice(0, max)
+      .map((r) => `slide ${r.slide}: left ${r.x}px, top ${r.y}px, ${r.w}×${r.h}px`)
+      .join("; ") + (rows.length > max ? `; … +${rows.length - max}` : "");
+
+  const copyAs = (a, base) => {
+    const out = base + path.extname(a.name);
+    fs.copyFileSync(path.join(assetsDir, a.name), path.join(images, out));
+    return out;
+  };
+
+  if (bg) {
+    const n = copyAs(bg, "template-bg");
+    const slides = bgSlides(bg.name);
+    lines.push(
+      "## Background",
+      "",
+      slides.length ? `Used as the slide background on template slides: ${slides.join(", ")}` : "",
+      "",
+      "```html",
+      `<img class="bg-img" src="images/${n}" alt="">`,
+      "```",
+      "",
+    );
+  }
+  if (logo) {
+    const n = copyAs(logo, "template-logo");
+    const rows = usage(logo.name);
+    lines.push(
+      "## Logo",
+      "",
+      rows.length ? `Placed on template slides: ${fmt(rows)}` : "",
+      "",
+      "```html",
+      `<img class="logo" src="images/${n}" alt="Logo">`,
+      "```",
+      "",
+      "Add `with-logo` to the slide class when it carries the logo — it reserves the top chrome band so text never collides with the logo.",
+      "",
+    );
+  }
+  decor.forEach((a, i) => {
+    const n = copyAs(a, `template-decor-${i + 1}`);
+    const rows = usage(a.name);
+    const viaLayout = rows.length ? [] : layoutSlides(a.name);
+    lines.push(
+      `## Decor ${i + 1}`,
+      "",
+      rows.length
+        ? `In the template it appears at: ${fmt(rows)} (reference only)`
+        : viaLayout.length
+          ? `From the slide layout — visible on template slides ${viaLayout.slice(0, 6).join(", ")}${viaLayout.length > 6 ? " …" : ""}`
+          : "Placement in the template is unclear — it is an edge illustration.",
+      "",
+      "Stage px (1280×720), 1:1 with this deck. These are HINTS from the template's own layout: you may move, resize, bleed or mirror the decor, swap in another deployed decor, or borrow a motif from another template slide. What matters is that the template's visual vocabulary is present and never collides with text.",
+      "",
+      "```html",
+      rows.length
+        ? `<img class="decor-img" style="left:${rows[0].x}px; top:${rows[0].y}px; width:${rows[0].w}px" src="images/${n}" alt="">`
+        : `<img class="decor-img pos-tr" src="images/${n}" alt="">`,
+      "```",
+      "",
+    );
+  });
+  if (!bg && !logo && !decor.length) {
+    lines.push("_The template has no reusable background/logo/decor (a flat token-only style)._");
+  }
+  lines.push(
+    "## Checklist",
+    "",
+    "- background on the slides where the template shows one;",
+    "- logo in the same corner (add `with-logo` to those slides);",
+    "- **at least one template decor element** placed somewhere sensible (cover/closing/section edge);",
+    "- placement, size and the choice of decor are yours — adapt to the new content.",
+    "",
+  );
+  fs.writeFileSync(path.join(images, "template-assets.md"), lines.join("\n"));
+  return { bg: !!bg, logo: !!logo, decor: decor.length, dir: images };
 }
 
 function tokensCss(p, slug) {
@@ -288,7 +441,9 @@ async function main() {
   const positional = argv.filter((a, i) => !a.startsWith("--") && (argv[i - 1] === undefined || !argv[i - 1].startsWith("--")));
   const file = positional[0];
   if (!file) {
-    console.error('usage: style-profile.cjs <deck.pptx> --name "Название" [--slug id] [--assets none|key|all] [--max-assets N] [--out-dir dir]');
+    console.error(
+      'usage: style-profile.cjs <deck.pptx> --name "Название" [--slug id] [--assets none|key|all] [--max-assets N] [--out-dir dir] [--deploy <deck-dir>]',
+    );
     process.exit(2);
   }
   const name = flag("--name") || path.basename(file).replace(/\.pptx$/i, "");
@@ -305,6 +460,24 @@ async function main() {
   const deck = await readDeck(file);
   const colors = pickColors(deck);
   const fonts = pickFonts(deck);
+  // A proprietary template face (e.g. SB Sans) would block validate with
+  // FONT NOT LOADED, so substitute the nearest vendored face here and record
+  // the substitution in the profile + console.
+  const VENDORED = ["Inter", "Source Serif 4", "Unbounded", "JetBrains Mono"];
+  const nearestVendored = (name) => {
+    const n = String(name || "");
+    if (!n) return "Inter";
+    if (VENDORED.some((v) => v.toLowerCase() === n.toLowerCase())) return VENDORED.find((v) => v.toLowerCase() === n.toLowerCase());
+    if (/mono|code|consol/i.test(n)) return "JetBrains Mono";
+    if (/serif|georgia|times|garamond|book|antiqua/i.test(n) && !/sans/i.test(n)) return "Source Serif 4";
+    if (/display|headline|decor|black|extra|wide/i.test(n) && !/sans/i.test(n)) return "Unbounded";
+    return "Inter";
+  };
+  const fontsFinal = { display: nearestVendored(fonts.display), body: nearestVendored(fonts.body) };
+  const fontSubstitutions = [
+    ...(fontsFinal.display !== fonts.display ? [`display: ${fonts.display} → ${fontsFinal.display}`] : []),
+    ...(fontsFinal.body !== fonts.body ? [`body: ${fonts.body} → ${fontsFinal.body}`] : []),
+  ];
   const media = pickAssets(deck, assetsMode);
   const maxRaw = flag("--max-assets");
   const maxAssets = maxRaw === undefined ? undefined : Math.max(0, parseInt(maxRaw, 10) || 0);
@@ -333,10 +506,12 @@ async function main() {
       dark: colors.darkBg,
     },
     fonts: {
-      display: fonts.display,
-      body: fonts.body,
+      display: fontsFinal.display,
+      body: fontsFinal.body,
+      original: { display: fonts.display, body: fonts.body },
+      substitutions: fontSubstitutions,
       histogram: TOP(deck.fontHistogram, 8),
-      note: "Вендорные лица из fonts/ скилла: Inter, Source Serif 4, Unbounded, JetBrains Mono. Если в теме чужое лицо — подставить ближайшее вендорное и сказать пользователю, что шрифт заменён.",
+      note: "Вендорные лица из fonts/ скилла: Inter, Source Serif 4, Unbounded, JetBrains Mono. Чужое лицо уже заменено ближайшим вендорным; скажи пользователю, что шрифт заменён.",
     },
     colors: { top: TOP(deck.colorHistogram, 12) },
     density: {
@@ -363,15 +538,22 @@ async function main() {
     principles: buildPrinciples(deck, colors, fonts),
   };
   fs.writeFileSync(path.join(dir, "profile.json"), JSON.stringify(profile, null, 2));
-  fs.writeFileSync(path.join(dir, "tokens.css"), tokensCss(profile.tokens ? { ...colors, fonts } : { ...colors, fonts }, slug));
+  fs.writeFileSync(path.join(dir, "tokens.css"), tokensCss({ ...colors, fonts: fontsFinal }, slug));
 
   console.log("style profile: " + dir);
   console.log(
     `tokens: bg=${colors.bg} surface=${colors.surface} ink=${colors.ink} accent=${colors.accent} ` +
-      `display="${fonts.display}" body="${fonts.body}"`,
+      `display="${fontsFinal.display}" body="${fontsFinal.body}"`,
   );
+  if (fontSubstitutions.length) console.log(`fonts: substituted ${fontSubstitutions.join("; ")}`);
   console.log(`assets: ${assets.length} file(s)${assets.length ? " → " + path.join(dir, "assets") : ""}`);
   if (colors.imageBgSlides) console.log(`note: ${colors.imageBgSlides} slide(s) use image backgrounds — reuse assets/ backgrounds or a plain token bg`);
+  const deployDir = flag("--deploy");
+  if (deployDir) {
+    const r = deployAssets(path.join(dir, "assets"), assets, path.resolve(deployDir), deck);
+    console.log(`deploy: bg=${r.bg ? "yes" : "no"} logo=${r.logo ? "yes" : "no"} decor=${r.decor} → ${r.dir}`);
+    console.log("deploy: paste the snippets from images/template-assets.md (bg-img / logo / decor-img); the deck MUST use at least one of them");
+  }
   console.log("use: paste tokens.css before styles/_base.css; read profile.json for principles and evidence");
 }
 

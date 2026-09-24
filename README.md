@@ -26,7 +26,7 @@ density).
 | Text overlap | line-level detector (Range API + SVG labels) in probe + `TIGHT-GAP`; found and fixed a real export overlap (exact line spacing) | ✅ |
 | Artifact validation | `validate.cjs`: ports of the python checks (empty placeholders, split-box, WCAG contrast, hierarchy, fullness, density, repetition, notes) + font size, placeholders, typography, stage size, native text/fonts, normAutofit — plus a `validate.json` report | ✅ |
 | .pptx post-processing | `pptx-post.cjs`: exact→proportional line spacing (37 fixes per deck), PDF render without overlaps | ✅ |
-| Contract guards | `expand-styles` (managed CSS block), `hidden-slide`/`missing-br`/`no-accent`/`sparse-box` probe checks, export blocked on blocking issues (exit 4, no .pptx), temp-dir decks refused, `slide-count-mismatch` | ✅ |
+| Contract guards | `expand-styles` (managed CSS block), `hidden-slide`/`missing-br`/`no-accent`/`sparse-box` probe checks, export blocked on blocking errors (exit 4, no .pptx); taste findings are labelled `suggestion:` and never block, temp-dir decks refused, `slide-count-mismatch` | ✅ |
 | Vision workflow (v3) | `shots.cjs` renders any .pptx to per-slide PNGs (via the app's `--pptx-verify`) + text digest; the SKILL requires looking at template slides before style copying and at own slides before delivery | ✅ (renderer on the work laptop) |
 | Template-copy guards (v3) | `validate`: `decor-as-background` error (transparent/decor media stretched as a background), `visual-scarcity` warning; `style-profile`: contrast guard for extracted ink/bg | ✅ |
 | Self-reflection driver (v3) | `review.cjs`: render → PNG paths → probe → validate → checklist in one command; template mode adds reference shots | ✅ |
@@ -105,6 +105,10 @@ deck.html ──┬─ expand-styles.cjs  canonical CSS into the managed style b
 - Group rotation is approximated when reading (flagged in JSON).
 - Proprietary fonts from a sample are replaced with the nearest vendored
   face — the skill tells the user about the substitution.
+- A reused template background is embedded per slide, so decks reusing
+  heavy template art grow by the image size per slide (a 3-slide deck with a
+  565KB background is ~2.6MB). Reuse backgrounds only where the template uses
+  them.
 - Pixel stats for media are computed for PNG/SVG; for JPEG/WebP/WDP/EMF an
   honest "stats unavailable offline" is written (the role is still determined
   from geometry and usage).

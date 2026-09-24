@@ -59,7 +59,10 @@ with maximum `m`: `y = 260 - (v/m) * 230`. X axis — evenly from 40 to 490.
 </div>
 ```
 
-Column `height` = `value / maximum × 100%`. One color — the accent; for a
+Column `height` = `value / maximum × 100%`. In the `sber`/`signal-night`
+styles the bars are filled with the brand gradient automatically
+(`--grad-brand`); in the other styles they use the accent color. One color
+family — for a
 "second series" do not introduce a new color, mark it with a caption/pattern.
 
 ## 3. Horizontal bars (ranking)

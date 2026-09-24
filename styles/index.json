@@ -3,12 +3,34 @@
   "updated": "2026-09-24",
   "styles": [
     {
+      "id": "sber",
+      "name": "Sber (brand, default)",
+      "tone": "light",
+      "mood": "brand, confident, clean",
+      "best_for": [
+        "product",
+        "strategy",
+        "reports",
+        "pitches",
+        "everything Sber-related"
+      ],
+      "description": "Фирменный стиль Сбера: белый холст, брендовый градиент #0098F8 → #21A038 → #F1E813 в акцентах и полосах графиков, чистый Inter вместо SB Sans. Стиль по умолчанию.",
+      "dir": "sber",
+      "default": true
+    },
+    {
       "id": "grid-paper",
-      "name": "Grid Paper",
+      "name": "Grid Paper (neutral IKB)",
       "tone": "light",
       "mood": "precise, factual, calm",
-      "best_for": ["product", "analysis", "methodology", "quarterly reviews", "internal reports"],
-      "description": "Белый холст, строгая сетка, прямые углы, один насыщенный синий акцент, крупная типографика. Формат «факты и структура».",
+      "best_for": [
+        "product",
+        "analysis",
+        "methodology",
+        "quarterly reviews",
+        "internal reports"
+      ],
+      "description": "Нейтральный светлый стиль: белый холст, IKB-синий акцент, прямые углы. Когда бренд не нужен.",
       "dir": "grid-paper"
     },
     {
@@ -16,17 +38,27 @@
       "name": "Ink Press",
       "tone": "light",
       "mood": "warm, thoughtful, editorial",
-      "best_for": ["reports", "brand stories", "research", "long-read summaries"],
+      "best_for": [
+        "reports",
+        "brand stories",
+        "research",
+        "long-read summaries"
+      ],
       "description": "Тёплая бумага, антиква в заголовках, тонкие линии, спокойный кирпичный акцент. Формат «история и смысл».",
       "dir": "ink-press"
     },
     {
       "id": "signal-night",
-      "name": "Signal Night",
+      "name": "Signal Night (dark brand)",
       "tone": "dark",
       "mood": "confident, high-impact",
-      "best_for": ["strategy", "board decks", "pitch", "launch"],
-      "description": "Тёмный графит, крупные цифры, светящийся голубой акцент, акцентные карточки. Формат «уверенно и ярко».",
+      "best_for": [
+        "strategy",
+        "board decks",
+        "pitch",
+        "launch"
+      ],
+      "description": "Тёмный графит, брендовая зелень и синий акцент Сбера. Формат «уверенно и ярко» для питчей.",
       "dir": "signal-night"
     }
   ],

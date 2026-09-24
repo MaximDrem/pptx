@@ -63,6 +63,11 @@ one click.
 - more than one accent per slide is allowed when the layout expresses real
   hierarchy (e.g. two key cards among six), but do not accent everything
   equally — an accent that marks nothing marks nothing;
+- **accent discipline**: accent is small by design — badges, icons, numbers,
+  one short card (≤2 lines), a highlighted row. Headings stay ink (only
+  section dividers are accent); a heading painted in accent → error
+  `accent-heading`. A surface over 40% of the slide → error `accent-overload`
+  (the acid "slab" defect: never paint a content block with accent);
 - the kicker, footer, soft icon badges and icon strokes do NOT count as
   emphasis: they are chrome, not signal.
 

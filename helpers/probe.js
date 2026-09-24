@@ -429,9 +429,10 @@
 
     const slideRect = slide.getBoundingClientRect();
 
-    // Decorative layers (`.decor`, `.cover-art`) may intentionally bleed past
-    // the slide edges and must not count as content or trigger geometry checks.
-    const isDecor = (el) => !!(el.closest && el.closest(".decor, .cover-art"));
+    // Decorative layers (`.decor`, `.cover-art`, template art) may intentionally
+    // bleed past the slide edges and must not count as content or trigger
+    // geometry checks.
+    const isDecor = (el) => !!(el.closest && el.closest(".decor, .cover-art, .bg-img, .logo, .decor-img"));
 
     // A display:none (or zero-sized) slide is invisible to the export engine:
     // it is silently dropped from the .pptx (real incident: 8 of 10 slides
@@ -568,10 +569,50 @@
     // Kicker, footer, soft icon badges and icon strokes do not count.
     if ((slide.dataset.role || "content") === "content") {
       const accentSel =
-        ".card.accent, .node.accent, .cell.accent, .step.accent, .pill.accent, .icon-badge:not(.soft), .accent-text, .fill, .area, .series, .point, .seg, .table .hl, .timeline .dot, .cover-art";
+        ".card.accent, .node.accent, .cell.accent, .step.accent, .pill.accent, .icon-badge:not(.soft), .accent-text, .fill, .area, .series, .point, .seg, .table .hl, .timeline .dot, .cover-art, .rule-brand";
       if (!slide.querySelector(accentSel)) {
         push("no-accent", "no emphasis accent on this slide — highlight the key card, step, number or table row");
       }
+    }
+
+    // Accent misuse (the "acid slab" and "blue on blue" defects):
+    //  - long headings must stay ink (accent headings read as decoration);
+    //  - one accent surface larger than 40% of the slide is a slab, not an
+    //    accent — keep accent to badges, numbers, one short card.
+    const accentRgb = (() => {
+      const raw = getComputedStyle(slide).getPropertyValue("--c-accent").trim();
+      const m = /^#([0-9a-f]{6})$/i.exec(raw);
+      if (!m) return null;
+      const n = parseInt(m[1], 16);
+      return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+    })();
+    if (accentRgb) {
+      const nearAccent = (c) => c && Math.abs(c.r - accentRgb.r) + Math.abs(c.g - accentRgb.g) + Math.abs(c.b - accentRgb.b) < 36;
+      if (role !== "section") {
+        for (const h of Array.from(slide.querySelectorAll(".headline, h1, h2"))) {
+          if (nearAccent(parseColor(getComputedStyle(h).color))) {
+            push("accent-heading", "a heading is painted in the accent color — headings stay ink; accent belongs to badges, numbers and one short card");
+            break;
+          }
+        }
+      }
+      let accentArea = 0;
+      for (const el of Array.from(slide.querySelectorAll("*"))) {
+        if (isDecor(el)) continue;
+        const st = getComputedStyle(el);
+        if (!nearAccent(parseColor(st.backgroundColor))) continue;
+        const r = el.getBoundingClientRect();
+        const a = r.width * r.height;
+        if (a > accentArea) accentArea = a;
+      }
+      if (slideArea > 0 && accentArea / slideArea > 0.4) {
+        push("accent-overload", "an accent-filled block covers over 40% of the slide — accent is emphasis, not a content background; use .card + a small accent element");
+      }
+    }
+
+    // A cover with no visual at all reads as a typed page.
+    if (role === "cover" && !slide.querySelector(".cover-art, .decor, .bg-img, .logo, .decor-img, img, svg, .chart")) {
+      push("plain-cover", "the cover has no visual layer — add cover-art, decor, a logo or the template's background");
     }
 
     // A tall painted box whose text fills less than a third of its height
@@ -697,14 +738,33 @@
     }
   }
 
+  // Severity: only contract violations block the export (exit 4). Taste and
+  // quality hints are suggestions — the model reviews them visually and fixes
+  // what it agrees with (this is how SOTA skills balance lint vs judgement).
+  const ERROR_TYPES = new Set([
+    "text-clip",
+    "out-of-bounds",
+    "text-overlap",
+    "low-contrast",
+    "blank",
+    "maybe-blank",
+    "broken-image",
+    "stage-broken",
+    "probe-error",
+    "hidden-slide",
+    "missing-br",
+  ]);
+  const withSeverity = (issue) => ({ ...issue, severity: ERROR_TYPES.has(issue.type) ? "error" : "warning" });
+
   function report() {
     const stageR = stageRect();
     return withAllSlidesMeasurable(() =>
       slides().map((slide, i) => {
         try {
-          return checkSlide(slide, i, stageR);
+          const res = checkSlide(slide, i, stageR);
+          return { ...res, issues: (res.issues || []).map(withSeverity) };
         } catch (e) {
-          return { index: i, issues: [{ type: "probe-error", detail: String((e && e.message) || e) }] };
+          return { index: i, issues: [{ type: "probe-error", detail: String((e && e.message) || e), severity: "error" }] };
         }
       }),
     );

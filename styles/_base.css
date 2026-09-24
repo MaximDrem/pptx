@@ -235,7 +235,7 @@
 
 .bars { display: flex; align-items: flex-end; gap: 22px; height: 250px; padding-top: 8px; }
 .bars .bar { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; gap: 8px; height: 100%; min-width: 0; }
-.bars .bar .fill { background: var(--c-accent); border-radius: var(--radius) var(--radius) 0 0; min-height: 4px; }
+.bars .bar .fill { background: var(--grad-brand, var(--c-accent)); border-radius: var(--radius) var(--radius) 0 0; min-height: 4px; }
 .bars .bar .lbl { font-size: 12.5px; color: var(--c-muted); text-align: center; }
 .bars .bar .val { font-family: var(--f-display); font-size: 17px; font-weight: 700; color: var(--c-ink); text-align: center; }
 
@@ -354,6 +354,24 @@
   color: var(--c-line);
 }
 
+/* Brand gradient rule: a short accent line for covers/sections (uses the
+   style's --grad-brand when defined, otherwise the accent color). */
+.rule-brand { width: 96px; height: 4px; border-radius: 999px; background: var(--grad-brand, var(--c-accent)); }
+.rule-brand.wide { width: 180px; }
+
+/* Template assets: the standard way to reuse a copied deck's background,
+   logo and decor (see style-profile.cjs --deploy). Put .bg-img FIRST inside
+   the slide; .logo usually sits top-right; .decor-img may bleed off-slide.
+   A slide that carries a logo gets `with-logo`: it reserves the top chrome
+   band so the heading never collides with the logo. */
+.bg-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+.logo { position: absolute; top: 40px; right: 72px; height: 30px; width: auto; pointer-events: none; }
+.logo.pos-tl { left: 72px; right: auto; }
+.logo.lg { height: 42px; }
+.decor-img { position: absolute; pointer-events: none; }
+.decor-img.pos-br { bottom: -60px; right: -40px; }
+.slide.with-logo .slide-pad { padding-top: 104px; }
+
 /* -------------------------------------------------------------- timeline */
 
 .timeline { display: flex; flex-direction: column; }
@@ -411,7 +429,7 @@
 .hbars { display: flex; flex-direction: column; gap: 14px; justify-content: center; }
 .hbar { display: grid; grid-template-columns: 130px 1fr 54px; align-items: center; gap: 14px; font-size: 14px; color: var(--c-ink); }
 .hbar .track { height: 12px; background: var(--c-surface); border-radius: 999px; overflow: hidden; }
-.hbar .fill { height: 100%; background: var(--c-accent); border-radius: 999px; }
+.hbar .fill { height: 100%; background: var(--grad-brand, var(--c-accent)); border-radius: 999px; }
 .hbar .val { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
 
 /* ------------------------------------------------------------- diagrams */
