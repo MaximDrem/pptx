@@ -1,0 +1,91 @@
+# presentation v2 — HTML-first presentations with a native .pptx export
+
+A skill for the work agent: the deck is built as **editable HTML**
+(`deck.html`, 1280×720 stage) and exported to **native PowerPoint** — real
+text, shapes, embedded TTFs, speaker notes. Fully offline: no npm/pip/network,
+all bundles live in `vendor/`.
+
+On top of that the skill can **read a .pptx completely** (layers, groups,
+pictures and SVG, tables, charts, text styles, notes, layout themes) and **copy
+the style of an attached presentation** (background, fonts, decor, layout
+density).
+
+## What is verified (and where)
+
+| Layer | Verification | Status |
+|---|---|---|
+| Reading .pptx | 10 real decks (incl. `ГигаКот_Стратегия_final.pptx`, 19 slides, 266 shapes, 95 pictures, 9 groups, 28 gradients, SVG/EMF/WDP) — the parser self-check against raw XML tags matches | ✅ on this machine |
+| HTML stage | `stage.css`, `_base.css`, 3 styles, fonts, Lucide icons — rendered in real Chromium | ✅ |
+| Render loop | probe (12 check types + metrics/inventory) on the reference deck — clean; the defect fixture catches all 6 types; an undeclared font yields `FONT NOT LOADED`; 10 patterns — clean | ✅ |
+| .pptx export | `example-deck.html` → 5 slides, 57 text runs, 68 shapes, 4 embedded TTFs, notes; LibreOffice imports and renders 1:1 | ✅ |
+| In-app one-shot | `app/deck-render.ts` (off-screen Electron, capturePage, export) — written following the proven `--pptx-verify` pattern, but Electron is not available on this machine | ⚠️ tested on the work laptop (see `tests/acceptance.md`) |
+| Style profile | extracted from `ГигаКот` (dark theme, background from pixels `#002A3A`, assets by role), `Сводка почты` (dark), `hybrid-work` (light) | ✅ |
+| Media roles (auto) | background/logo/decor/icon/photo/graphic from geometry and usage + `visual` (avgColor, dark, hasAlpha) — verified on ГигаКот | ✅ |
+| Text styles | font/size/color with the inheritance chain (run → endPara → defRPr → lstStyle → layout/master placeholders → txStyles → default), `hl=` (highlight), `on=` (background under text) | ✅ |
+| Box+text merging | `single-box` regression: run boxes → one PowerPoint shape, block children → not | ✅ |
+| Text overlap | line-level detector (Range API + SVG labels) in probe + `TIGHT-GAP`; found and fixed a real export overlap (exact line spacing) | ✅ |
+| Artifact validation | `validate.cjs`: ports of the python checks (empty placeholders, split-box, WCAG contrast, hierarchy, fullness, density, repetition, notes) + font size, placeholders, typography, stage size, native text/fonts, normAutofit — plus a `validate.json` report | ✅ |
+| .pptx post-processing | `pptx-post.cjs`: exact→proportional line spacing (37 fixes per deck), PDF render without overlaps | ✅ |
+
+Local acceptance run: `node tests/local/run-local.cjs` (Chrome required;
+the LibreOffice check is optional).
+
+## Architecture
+
+```
+deck.html ──┬─ lint-deck.cjs    static checks (offline, files, classes)
+            ├─ assets.cjs       inline fonts/images as data URIs
+            ├─ render.cjs ──► app --deck-render (Electron, off-screen)
+            │                   ├─ probe.js (metrics + inventory)
+            │                   ├─ slide-NN.png, report.json, inventory.json
+            │                   └─ dom-to-pptx.bundle.js → <slug>.pptx
+            └─ read-pptx.cjs / style-profile.cjs   (input: someone else's .pptx)
+```
+
+- **HTML is the source of truth.** Edits = HTML edits; the .pptx is rebuilt.
+- **Layout is measured, not guessed.** The exporter does not "understand"
+  flex/grid; it takes the final `x/y/w/h` of every element from Chromium — so
+  the HTML and the .pptx match pixel for pixel.
+- **.pptx reading is a custom parser** (`helpers/lib/xml.cjs` +
+  `lib/pptx.cjs`): dependency-free, with groups/transforms, run styles and a
+  media inventory.
+
+## Contracts that must not be broken
+
+- the stage is exactly 1280×720 (= 13.333×7.5in = 96dpi): PNG and PDF are
+  slide-for-slide;
+- slides are `<section class="slide">`, visibility via `.active` (not
+  `display:none`);
+- notes — `<template data-pptx-notes>` inside the slide;
+- fonts — vendored only (`fonts/`); hex colors — only in tokens;
+- every row inside a filled box is separated by `<br>` (one-box rule);
+- no internet and no chat tools inside the deck/helpers.
+
+## Provenance and licenses
+
+- `vendor/dom-to-pptx.bundle.js` — dom-to-pptx 2.1.2 (MIT), distributed as is;
+  sha256 matches the npm dist. License next to it.
+- `vendor/jszip.bundle.cjs` — JSZip 3.10.1 (MIT/GPLv3), sha256 = npm dist.
+- `fonts/` — Google Fonts (OFL 1.1), latin+cyrillic: Inter, Source Serif 4,
+  Unbounded, JetBrains Mono (woff2 — rendering, ttf — embedding into .pptx);
+  copyrights and the full license text — `fonts/NOTICE.txt`,
+  `fonts/LICENSE-OFL-1.1.txt`.
+- `styles/_base/icons/` — Lucide (ISC), a subset, attribution in the files.
+- `stage.css` is conceptually based on `viewport-base.css` from frontend-slides
+  (MIT); the style set was inspired by curated presets from the same project.
+  The code was written from scratch and verified by rendering.
+
+## Known limitations
+
+- EMF/WMF/WDP from old .pptx files are read and extracted but **not embedded
+  into HTML** (the browser cannot draw them): on rebuild they must be replaced
+  (SVG/PNG/redrawn) — the skill lists such files honestly.
+- Complex CSS effects (`backdrop-filter`, blend modes) are rasterized into a
+  picture by the exporter — editability is unaffected, but the text inside is
+  no longer text.
+- Group rotation is approximated when reading (flagged in JSON).
+- Proprietary fonts from a sample are replaced with the nearest vendored
+  face — the skill tells the user about the substitution.
+- Pixel stats for media are computed for PNG/SVG; for JPEG/WebP/WDP/EMF an
+  honest "stats unavailable offline" is written (the role is still determined
+  from geometry and usage).

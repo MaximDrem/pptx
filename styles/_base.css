@@ -1,0 +1,424 @@
+/* ===========================================================================
+   presentation v2 — styles/_base.css
+   Shared building blocks for every slide and every style profile.
+   All colors, fonts and radii come from the profile tokens (:root in
+   tokens.css). Never hard-code a hex in a slide — a new color is a token bug.
+
+   Vertical contract: .slide-pad is a full-height flex column; .content takes
+   the rest (flex:1) and centers its blocks. Nothing stretches: if the band
+   looks empty, add substance (a row, longer copy, a diagram) — the probe
+   reports lopsided emptiness as EMPTY REGION.
+   =========================================================================== */
+
+.slide-pad {
+  position: absolute;
+  inset: 0;
+  padding: 52px 72px 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  color: var(--c-ink);
+  font-family: var(--f-body);
+}
+
+/* ------------------------------------------------------------------ type */
+
+.kicker {
+  font-family: var(--f-body);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--c-accent);
+}
+
+.headline {
+  font-family: var(--f-display);
+  font-size: 38px;
+  line-height: 1.1;
+  font-weight: 700;
+  color: var(--c-ink);
+  margin: 0;
+  max-width: 22ch;
+}
+.headline.xl { font-size: 58px; max-width: 18ch; }
+.headline.sm { font-size: 28px; }
+.headline.wide { max-width: none; }
+
+.lead {
+  font-size: 18px;
+  line-height: 1.45;
+  font-weight: 400;
+  color: var(--c-muted);
+  margin: 0;
+  max-width: 64ch;
+}
+
+.slide-head { display: flex; flex-direction: column; gap: 8px; }
+
+.footer {
+  position: absolute;
+  left: 72px;
+  right: 72px;
+  bottom: 22px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--c-muted);
+}
+
+/* ------------------------------------------------------------------ body */
+
+.content {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 20px;
+}
+.content.top { justify-content: flex-start; }
+.content.bottom { justify-content: flex-end; }
+
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+.grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+
+.split {
+  display: grid;
+  grid-template-columns: 7fr 5fr;
+  gap: 34px;
+  align-items: center;
+  flex: 1;
+  min-height: 0;
+}
+.split.rev { grid-template-columns: 5fr 7fr; }
+
+.card {
+  background: var(--c-surface);
+  border: 1px solid var(--c-line);
+  border-radius: var(--radius);
+  padding: 20px 22px;
+  /* block, не flex: flex «блокифицирует» текстовые раны и ломает склейку
+     бокса с текстом в одну фигуру PowerPoint */
+  display: block;
+  min-width: 0;
+}
+.card.accent { background: var(--c-accent); color: var(--c-on-accent); border-color: transparent; }
+.card.inverse { background: var(--c-ink); color: var(--c-bg); border-color: transparent; }
+.card.inverse h3, .card.inverse p, .card.inverse .card-cap { color: var(--c-bg); }
+.card.accent h3, .card.accent p, .card.accent .card-cap, .card.accent .list li { color: var(--c-on-accent); }
+.card.ghost { background: transparent; }
+
+.card h3 { font-family: var(--f-body); font-size: 17px; font-weight: 600; margin: 0; color: var(--c-ink); }
+.card p { font-size: 14.5px; line-height: 1.45; color: var(--c-muted); margin: 0; }
+.card.accent p { opacity: 0.88; }
+
+.card-cap {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--c-muted);
+}
+
+/* --------------------------------------------------------------- numbers */
+
+.stat { display: flex; flex-direction: column; gap: 6px; }
+.stat .num {
+  font-family: var(--f-display);
+  font-size: 62px;
+  line-height: 1;
+  font-weight: 800;
+  color: var(--c-ink);
+}
+.stat .num.sm { font-size: 44px; }
+.stat .num.accent-text { color: var(--c-accent); }
+.stat .cap { font-size: 14px; line-height: 1.35; font-weight: 500; color: var(--c-muted); max-width: 28ch; }
+
+.kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
+.kpi-row.three { grid-template-columns: repeat(3, 1fr); }
+.kpi-row.two { grid-template-columns: repeat(2, 1fr); }
+.kpi-row .stat { border-top: 2px solid var(--c-line); padding-top: 14px; }
+
+/* ----------------------------------------------------------------- list */
+
+.list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 12px; }
+.list li {
+  position: relative;
+  padding-left: 20px;
+  font-size: 15.5px;
+  line-height: 1.4;
+  color: inherit; /* cards may re-color their content (accent/inverse) */
+}
+.list li::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 0.5em;
+  width: 7px;
+  height: 7px;
+  background: var(--c-accent);
+  border-radius: 50%;
+}
+.list.numbered { counter-reset: n; }
+.list.numbered li { padding-left: 34px; }
+.list.numbered li::before {
+  counter-increment: n;
+  content: counter(n, decimal-leading-zero);
+  position: absolute;
+  left: 0;
+  top: 0.1em;
+  width: auto;
+  height: auto;
+  background: none;
+  border-radius: 0;
+  color: var(--c-accent);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+}
+
+/* ---------------------------------------------------------------- quote */
+
+.quote {
+  font-family: var(--f-display);
+  font-size: 32px;
+  line-height: 1.3;
+  font-weight: 600;
+  color: var(--c-ink);
+  margin: 0;
+  max-width: 32ch;
+}
+.quote .by { display: block; margin-top: 14px; font-family: var(--f-body); font-size: 14px; font-weight: 500; color: var(--c-muted); }
+
+/* ---------------------------------------------------------------- steps */
+
+.steps { display: flex; gap: 18px; }
+.steps .step {
+  flex: 1;
+  border-top: 2px solid var(--c-line);
+  padding-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.steps .step .n { font-family: var(--f-display); font-size: 22px; color: var(--c-accent); font-weight: 800; }
+.steps .step h3 { font-size: 15px; font-weight: 600; margin: 0; color: var(--c-ink); }
+.steps .step p { font-size: 13.5px; line-height: 1.4; color: var(--c-muted); margin: 0; }
+.steps .step.accent { border-top-color: var(--c-accent); }
+.steps .step.accent h3 { color: var(--c-accent); }
+
+/* ---------------------------------------------------------------- table */
+
+.table { width: 100%; border-collapse: collapse; font-size: 14.5px; color: var(--c-ink); }
+.table th {
+  text-align: left;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--c-muted);
+  border-bottom: 1px solid var(--c-line);
+  padding: 10px 12px;
+}
+.table td { padding: 11px 12px; border-bottom: 1px solid var(--c-line); vertical-align: top; }
+.table tr:last-child td { border-bottom: none; }
+.table td.num, .table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.table tr.hl td { color: var(--c-ink); }
+.table tr.hl td:first-child { color: var(--c-accent); font-weight: 700; }
+
+/* ----------------------------------------------------------------- bars */
+
+.bars { display: flex; align-items: flex-end; gap: 22px; height: 250px; padding-top: 8px; }
+.bars .bar { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; gap: 8px; height: 100%; min-width: 0; }
+.bars .bar .fill { background: var(--c-accent); border-radius: var(--radius) var(--radius) 0 0; min-height: 4px; }
+.bars .bar .lbl { font-size: 12.5px; color: var(--c-muted); text-align: center; }
+.bars .bar .val { font-family: var(--f-display); font-size: 17px; font-weight: 700; color: var(--c-ink); text-align: center; }
+
+/* ---------------------------------------------------------------- media */
+
+.media { border-radius: var(--radius); overflow: hidden; background: var(--c-surface); min-height: 0; }
+.media img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.media.contain img { object-fit: contain; }
+.media .cap { padding: 8px 10px; font-size: 12px; color: var(--c-muted); }
+
+/* ------------------------------------------- text inside a painted box
+   ПРАВИЛО ОДНОГО БОКСА (проверено экспортом): текст внутри цветного/
+   обведённого бокса пишется ПРЯМО в него текстовыми ранами, и в боксе не
+   должно быть НИЧЕГО, кроме ранов. Тогда экспорт делает ОДНУ нативную фигуру
+   PowerPoint с текстом — человек правит его кликом по боксу.
+   Любой не-текстовый ребёнок (иконка, <ul>, <p>, <div>, absolute) разбивает
+   бокс на «фигуру + текстбоксы поверх». Иконки/бейджи ставь РЯДОМ с боксом
+   (обёртка .card-stack), а не внутрь.
+   КАЖДАЯ СТРОКА-РАН РАЗДЕЛЯЕТСЯ <br>: без него экспорт склеивает раны в
+   один абзац <a:p>, и в PowerPoint заголовок и текст окажутся одной строкой. */
+
+.t-line { display: inline-block; width: 100%; }       /* строка-стек */
+.t-title { display: inline-block; width: 100%; font-weight: 700; font-size: 17px; color: var(--c-ink); margin: 0 0 6px; }
+.t-body { display: inline-block; width: 100%; font-weight: 400; font-size: 14.5px; color: var(--c-muted); margin: 0 0 4px; }
+.t-cap { display: inline-block; width: 100%; font-weight: 600; font-size: 12px; letter-spacing: 0.1em; color: var(--c-muted); margin: 0 0 6px; }
+.t-title:last-child, .t-body:last-child, .t-cap:last-child { margin-bottom: 0; }
+.card.accent .t-title, .card.accent .t-body, .card.accent .t-cap { color: var(--c-on-accent); }
+.card.inverse .t-title, .card.inverse .t-body, .card.inverse .t-cap { color: var(--c-bg); }
+.flow .node .t-title, .matrix .cell .t-title { font-size: 15px; }
+.flow .node .t-body, .matrix .cell .t-body { font-size: 13.5px; }
+.card-stack { display: flex; flex-direction: column; gap: 10px; }
+.card-stack .icon-badge { align-self: flex-start; }
+
+/* ------------------------------------------------------------- utilities */
+
+.accent-text { color: var(--c-accent); }
+.muted { color: var(--c-muted); }
+.mono { font-family: var(--f-mono); }
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border: 1px solid var(--c-line);
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--c-muted);
+}
+.rule { border: 0; border-top: 1px solid var(--c-line); width: 100%; margin: 0; }
+.mt-auto { margin-top: auto; }
+.grow { flex: 1; min-height: 0; }
+.center { text-align: center; align-items: center; }
+.row { display: flex; gap: 16px; align-items: center; }
+
+/* Speaker notes never render on a slide: they become .pptx notes. */
+.slide [data-notes],
+.slide [data-pptx-notes] { display: none !important; }
+
+/* ----------------------------------------------------------------- icons */
+
+.icon { width: 24px; height: 24px; flex: none; display: inline-block; vertical-align: -0.18em; }
+.icon.lg { width: 30px; height: 30px; }
+.icon.xl { width: 40px; height: 40px; }
+.icon-badge {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: var(--c-accent);
+  color: var(--c-on-accent);
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.icon-badge.soft { background: var(--c-surface); color: var(--c-accent); }
+.icon-badge .icon { width: 21px; height: 21px; }
+
+/* ----------------------------------------------------------------- cover */
+
+.slide.cover .slide-pad { justify-content: flex-end; padding-bottom: 84px; }
+.slide.cover .headline { max-width: 17ch; }
+.slide.section .slide-pad { justify-content: center; }
+.slide.section .headline { color: var(--c-accent); }
+
+/* --------------------------------------------------------------- charts
+   SVG snippets live in charts.md. Geometry is authored (honest numbers),
+   no libraries: the exporter turns SVG into native PowerPoint shapes. */
+
+.chart { width: 100%; }
+.chart svg { display: block; width: 100%; height: auto; max-height: 320px; overflow: visible; }
+.chart.tall svg { max-height: 420px; }
+.chart .grid-line { stroke: var(--c-line); stroke-width: 1; }
+.chart .axis { stroke: var(--c-line); stroke-width: 1.5; }
+.chart .series { fill: none; stroke: var(--c-accent); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.chart .series.alt { stroke: var(--c-muted); }
+.chart .area { fill: var(--c-accent); opacity: 0.12; }
+.chart .point { fill: var(--c-accent); }
+.chart .lbl { font: 500 12px var(--f-body); fill: var(--c-muted); }
+.chart .val { font: 700 13px var(--f-body); fill: var(--c-ink); }
+
+.legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 13.5px; color: var(--c-muted); }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; background: var(--c-accent); margin-right: 7px; vertical-align: -1px; }
+.legend i.alt { background: var(--c-ink); }
+.legend i.muted { background: var(--c-muted); }
+
+.donut { display: flex; align-items: center; gap: 28px; }
+.donut svg { width: 210px; height: 210px; flex: none; }
+.donut circle { fill: none; stroke-width: 24; }
+.donut .track { stroke: var(--c-surface); }
+.donut .seg { stroke: var(--c-accent); transform: rotate(-90deg); transform-origin: 50% 50%; }
+.donut .seg.alt { stroke: var(--c-ink); }
+.donut .seg.muted { stroke: var(--c-muted); }
+.donut .center { font: 800 24px var(--f-display); fill: var(--c-ink); }
+.donut .center-cap { font: 500 10px var(--f-body); fill: var(--c-muted); }
+.donut .stack { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+
+.hbars { display: flex; flex-direction: column; gap: 14px; justify-content: center; }
+.hbar { display: grid; grid-template-columns: 130px 1fr 54px; align-items: center; gap: 14px; font-size: 14px; color: var(--c-ink); }
+.hbar .track { height: 12px; background: var(--c-surface); border-radius: 999px; overflow: hidden; }
+.hbar .fill { height: 100%; background: var(--c-accent); border-radius: 999px; }
+.hbar .val { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* ------------------------------------------------------------- diagrams */
+
+.matrix { display: grid; grid-template-columns: 46px 1fr 1fr; grid-template-rows: 1fr 1fr 46px; gap: 10px; }
+.matrix .axis-y { grid-row: 1 / 3; grid-column: 1; writing-mode: vertical-rl; transform: rotate(180deg); }
+.matrix .axis-x { grid-row: 3; grid-column: 2 / 4; }
+.matrix .axis-y, .matrix .axis-x {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: 600 12px var(--f-body);
+  color: var(--c-muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.matrix .cell {
+  background: var(--c-surface);
+  border: 1px solid var(--c-line);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  display: block;
+  min-width: 0;
+}
+.matrix .cell.accent { background: var(--c-accent); color: var(--c-on-accent); border-color: transparent; }
+.matrix .cell.accent h3, .matrix .cell.accent p { color: var(--c-on-accent); }
+
+.funnel { display: flex; flex-direction: column; gap: 10px; align-items: center; justify-content: center; }
+.funnel .f {
+  height: 56px;
+  border-radius: var(--radius);
+  background: var(--c-accent);
+  color: var(--c-on-accent);
+  /* block + line-height вместо flex-центрирования: текст остаётся раном */
+  display: block;
+  text-align: center;
+  line-height: 56px;
+  font: 600 14.5px var(--f-body);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.funnel .f:nth-child(1) { width: 100%; }
+.funnel .f:nth-child(2) { width: 78%; opacity: 0.85; }
+.funnel .f:nth-child(3) { width: 56%; opacity: 0.7; }
+.funnel .f:nth-child(4) { width: 36%; opacity: 0.55; }
+
+.flow { display: flex; align-items: stretch; gap: 12px; min-height: 140px; }
+.flow .node {
+  flex: 1;
+  border: 1px solid var(--c-line);
+  border-radius: var(--radius);
+  background: var(--c-surface);
+  padding: 18px 20px;
+  /* block, не flex: flex «блокифицирует» текстовые раны и делит бокс на
+     «фигуру + текстбоксы». Строки стекаются ранами .t-line/.t-*. */
+  display: block;
+  min-width: 0;
+}
+.flow .node.accent {
+  background: var(--c-accent);
+  border-color: transparent;
+  color: var(--c-on-accent);
+}
+.flow .node.accent .t-title, .flow .node.accent .t-body { color: var(--c-on-accent); }
+.flow .arrow { align-self: center; color: var(--c-muted); font-size: 20px; flex: none; }

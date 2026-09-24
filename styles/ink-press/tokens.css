@@ -1,0 +1,16 @@
+/* Ink Press — tokens. Order: stage.css → this file → base.css. */
+:root {
+  --stage-bg: #2a241d;
+  --slide-bg: #faf6ef;
+  --c-bg: #faf6ef;
+  --c-surface: #f1e9dc;
+  --c-ink: #211a13;
+  --c-muted: #6d6153;
+  --c-accent: #b23a2f;
+  --c-on-accent: #fdf9f3;
+  --c-line: rgba(33, 26, 19, 0.2);
+  --radius: 0px;
+  --f-display: "Source Serif 4", Georgia, serif;
+  --f-body: "Inter", Arial, sans-serif;
+  --f-mono: "JetBrains Mono", monospace;
+}

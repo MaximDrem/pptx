@@ -1,0 +1,37 @@
+{
+  "version": 2,
+  "updated": "2026-09-24",
+  "styles": [
+    {
+      "id": "grid-paper",
+      "name": "Grid Paper",
+      "tone": "light",
+      "mood": "precise, factual, calm",
+      "best_for": ["product", "analysis", "methodology", "quarterly reviews", "internal reports"],
+      "description": "Белый холст, строгая сетка, прямые углы, один насыщенный синий акцент, крупная типографика. Формат «факты и структура».",
+      "dir": "grid-paper"
+    },
+    {
+      "id": "ink-press",
+      "name": "Ink Press",
+      "tone": "light",
+      "mood": "warm, thoughtful, editorial",
+      "best_for": ["reports", "brand stories", "research", "long-read summaries"],
+      "description": "Тёплая бумага, антиква в заголовках, тонкие линии, спокойный кирпичный акцент. Формат «история и смысл».",
+      "dir": "ink-press"
+    },
+    {
+      "id": "signal-night",
+      "name": "Signal Night",
+      "tone": "dark",
+      "mood": "confident, high-impact",
+      "best_for": ["strategy", "board decks", "pitch", "launch"],
+      "description": "Тёмный графит, крупные цифры, светящийся голубой акцент, акцентные карточки. Формат «уверенно и ярко».",
+      "dir": "signal-night"
+    }
+  ],
+  "saved": {
+    "note": "Профили из присланных презентаций создаёт style-profile.cjs; они лежат в ~/.wsc/config/styles/<slug>/ и переживают обновления скилла. Перед выбором стиля проверь каталог: ls ~/.wsc/config/styles/",
+    "dir": "~/.wsc/config/styles"
+  }
+}

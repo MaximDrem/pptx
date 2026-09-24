@@ -1,0 +1,16 @@
+{
+  "families": ["Inter", "Source Serif 4", "Unbounded", "JetBrains Mono"],
+  "files": {
+    "Inter": ["inter-400.woff2", "inter-600.woff2", "inter-800.woff2"],
+    "Source Serif 4": ["source-serif-4-600.woff2"],
+    "Unbounded": ["unbounded-700.woff2"],
+    "JetBrains Mono": ["jetbrains-mono-400.woff2"]
+  },
+  "ttf": {
+    "Inter": ["inter-400.ttf", "inter-600.ttf", "inter-800.ttf"],
+    "Source Serif 4": ["source-serif-4-600.ttf"],
+    "Unbounded": ["unbounded-700.ttf"],
+    "JetBrains Mono": ["jetbrains-mono-400.ttf"]
+  },
+  "note": "woff2 is inlined into deck.html for rendering; ttf is handed to the dom-to-pptx export for EMBEDDING into the .pptx (the engine cannot read woff2). Style-profile warns when an extracted template font is missing here."
+}

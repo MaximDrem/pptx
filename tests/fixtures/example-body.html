@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>ГигаКот: офисные скиллы — пример деки</title>
+<style>
+/* ===== stage.css ===== */
+{{STAGE_CSS}}
+
+/* ===== fonts.css ===== */
+{{FONTS_CSS}}
+
+/* ===== tokens ===== */
+{{TOKENS_CSS}}
+
+/* ===== base.css ===== */
+{{BASE_CSS}}
+</style>
+</head>
+<body>
+<div class="deck-viewport">
+  <div class="deck-stage" id="deck-stage">
+
+    <section class="slide cover" data-role="cover">
+      <template data-pptx-notes>Открыть одним предложением: офисные артефакты должны создаваться агентом там, где сотрудник уже работает. Дальше — цифры и план.</template>
+      <div class="slide-pad">
+        <div class="kicker">Команда продукта · Q3 2026</div>
+        <h1 class="headline xl wide">Офисные скиллы — в каждый рабочий сценарий</h1>
+        <p class="lead">Что уже работает, что даст эффект в этом квартале и какое решение нужно принять сейчас.</p>
+        <div class="footer"><span>ГигаКот · стратегия</span><span>01</span></div>
+      </div>
+    </section>
+
+    <section class="slide" data-role="content">
+      <template data-pptx-notes>Ключевая мысль: рост не в новых пользователях, а в повторных сценариях. Дать время на вопросы по цифрам.</template>
+      <div class="slide-pad">
+        <div class="slide-head">
+          <div class="kicker">Результаты квартала</div>
+          <h2 class="headline wide">Выручка выросла на 32% за счёт повторных сценариев</h2>
+        </div>
+        <div class="content">
+          <div class="kpi-row">
+            <div class="stat"><div class="num">+32%</div><div class="cap">рост выручки к прошлому кварталу</div></div>
+            <div class="stat"><div class="num">62%</div><div class="cap">сотрудников вернулись к агенту в течение недели</div></div>
+            <div class="stat"><div class="num accent-text">4,6</div><div class="cap">средняя оценка сценария (из 5)</div></div>
+            <div class="stat"><div class="num">×2,4</div><div class="cap">артефактов на активного пользователя</div></div>
+          </div>
+          <div class="card accent">
+            <span class="t-title">Что это значит</span><br><span class="t-body">Продукт перешёл из «попробовать» в «пользоваться регулярно». Следующий рычаг — довести скиллы до повторяемых сценариев, а не добавлять новые разовые фичи.</span>
+          </div>
+        </div>
+        <div class="footer"><span>Результаты</span><span>02</span></div>
+      </div>
+    </section>
+
+    <section class="slide" data-role="content">
+      <div class="slide-pad">
+        <div class="slide-head">
+          <div class="kicker">Динамика</div>
+          <h2 class="headline">Регулярность важнее пиков запуска</h2>
+        </div>
+        <div class="content">
+          <div class="split">
+            <div class="content top">
+              <ul class="list">
+                <li>Пик запуска даёт разовые артефакты, а удержание — повторные сценарии.</li>
+                <li>Возврат на второй неделе предсказывает выручку лучше, чем DAU.</li>
+                <li>Скиллы делят один рейтинг: слабый скилл тянет вниз всю витрину.</li>
+              </ul>
+              <div class="card">
+                <span class="t-cap">Риск</span><br><span class="t-title">Размывание фокуса</span><br><span class="t-body">Каждый новый скилл увеличивает стоимость поддержки. План — не больше двух запусков за квартал.</span>
+              </div>
+            </div>
+            <div class="chart" data-pptx="chart">
+              <svg viewBox="0 0 520 300" role="img" aria-label="Динамика повторных сценариев по неделям">
+                <line class="grid-line" x1="40" y1="70" x2="500" y2="70"/>
+                <line class="grid-line" x1="40" y1="140" x2="500" y2="140"/>
+                <line class="grid-line" x1="40" y1="210" x2="500" y2="210"/>
+                <line class="axis" x1="40" y1="260" x2="500" y2="260"/>
+                <line class="axis" x1="40" y1="30" x2="40" y2="260"/>
+                <polygon class="area" points="40,238 130,214 220,180 310,168 400,120 490,74 490,260 40,260"/>
+                <polyline class="series" points="40,238 130,214 220,180 310,168 400,120 490,74"/>
+                <circle class="point" cx="130" cy="214" r="4"/>
+                <circle class="point" cx="310" cy="168" r="4"/>
+                <circle class="point" cx="490" cy="74" r="4"/>
+                <text class="lbl" x="40" y="284" text-anchor="middle">Н1</text>
+                <text class="lbl" x="130" y="284" text-anchor="middle">Н2</text>
+                <text class="lbl" x="220" y="284" text-anchor="middle">Н3</text>
+                <text class="lbl" x="310" y="284" text-anchor="middle">Н4</text>
+                <text class="lbl" x="400" y="284" text-anchor="middle">Н5</text>
+                <text class="lbl" x="490" y="284" text-anchor="middle">Н6</text>
+                <text class="val" x="490" y="58" text-anchor="middle">62%</text>
+              </svg>
+              <div class="legend"><span><i></i>повторные сценарии, % от активных</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="footer"><span>Динамика</span><span>03</span></div>
+      </div>
+    </section>
+
+    <section class="slide" data-role="content">
+      <div class="slide-pad">
+        <div class="slide-head">
+          <div class="kicker">План</div>
+          <h2 class="headline wide">Три шага до повторяемых сценариев</h2>
+        </div>
+        <div class="content">
+          <div class="steps">
+            <div class="step accent">
+              <div class="n">01</div>
+              <h3>До 30 сентября</h3>
+              <p>Свести каталог скиллов к сценариям с владельцем и метрикой.</p>
+            </div>
+            <div class="step">
+              <div class="n">02</div>
+              <h3>Октябрь</h3>
+              <p>Запустить два скилла с измеримым эффектом на удержание.</p>
+            </div>
+            <div class="step">
+              <div class="n">03</div>
+              <h3>Декабрь</h3>
+              <p>Перевести витрину на рейтинг по реальному использованию.</p>
+            </div>
+          </div>
+          <div class="card ghost">
+            <span class="t-body">Условие успеха: один владелец на скилл и еженедельный отчёт по повторным сценариям.</span>
+          </div>
+        </div>
+        <div class="footer"><span>План</span><span>04</span></div>
+      </div>
+    </section>
+
+    <section class="slide" data-role="closing">
+      <template data-pptx-notes>Закончить решением: голосование за два запуска квартала и ответственный по каждому.</template>
+      <div class="slide-pad">
+        <div class="content center">
+          <blockquote class="quote">«Продукт становится привычкой, когда пользователь возвращается за вторым артефактом.»
+            <span class="by">Из интервью с пользователями, сентябрь 2026</span>
+          </blockquote>
+          <div class="steps">
+            <div class="step"><div class="n">→</div><h3>Утвердить два запуска</h3><p>Решение голосованием сегодня.</p></div>
+            <div class="step"><div class="n">→</div><h3>Назначить владельцев</h3><p>По одному на скилл, до пятницы.</p></div>
+            <div class="step"><div class="n">→</div><h3>Вернуться с цифрами</h3><p>Отчёт по удержанию через четыре недели.</p></div>
+          </div>
+        </div>
+        <div class="footer"><span>Следующие шаги</span><span>05</span></div>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<div class="deck-controls">
+  <button id="deck-prev" aria-label="Назад">◀</button>
+  <span id="deck-counter">1 / 5</span>
+  <button id="deck-next" aria-label="Вперёд">▶</button>
+</div>
+
+<script>
+(() => {
+  const stage = document.getElementById("deck-stage");
+  const slides = Array.from(document.querySelectorAll(".slide"));
+  let current = 0;
+
+  const fit = () => {
+    const s = Math.min(window.innerWidth / 1280, window.innerHeight / 720);
+    stage.style.setProperty("--fit", String(Math.max(0.2, Math.min(1.6, s))));
+  };
+  const show = (i) => {
+    current = Math.max(0, Math.min(slides.length - 1, i));
+    slides.forEach((s, j) => s.classList.toggle("active", j === current));
+    const counter = document.getElementById("deck-counter");
+    if (counter) counter.textContent = (current + 1) + " / " + slides.length;
+    try { history.replaceState(null, "", "#" + (current + 1)); } catch (e) {}
+  };
+  window.addEventListener("resize", fit);
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight" || e.key === "PageDown" || e.key === " ") show(current + 1);
+    if (e.key === "ArrowLeft" || e.key === "PageUp") show(current - 1);
+    if (e.key === "Home") show(0);
+    if (e.key === "End") show(slides.length - 1);
+  });
+  document.getElementById("deck-prev").addEventListener("click", () => show(current - 1));
+  document.getElementById("deck-next").addEventListener("click", () => show(current + 1));
+  fit();
+  show(parseInt((location.hash || "#1").slice(1), 10) - 1 || 0);
+})();
+</script>
+</body>
+</html>

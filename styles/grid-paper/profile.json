@@ -1,0 +1,25 @@
+{
+  "id": "grid-paper",
+  "name": "Grid Paper",
+  "tone": "light",
+  "mood": "precise, factual, calm",
+  "best_for": ["product", "analysis", "methodology", "quarterly reviews", "internal reports"],
+  "description": "Белый холст, строгая сетка, прямые углы, один насыщенный синий акцент, крупная типографика.",
+  "tokens": {
+    "bg": "#FFFFFF",
+    "surface": "#F3F4F6",
+    "ink": "#0B0B0C",
+    "muted": "#63666B",
+    "accent": "#2447F0",
+    "onAccent": "#FFFFFF",
+    "line": "rgba(11,11,12,0.16)",
+    "stageBg": "#101216"
+  },
+  "type": { "display": "Unbounded", "body": "Inter", "mono": "JetBrains Mono", "scale": [16, 20, 24, 38, 58] },
+  "bg": { "treatment": "solid" },
+  "rules": [
+    "Один акцент на колоду; другие цвета не вводить.",
+    "Чем короче заголовок, тем крупнее: 2–4 слова — .headline.xl.",
+    "Пустоту лечить сеткой и ростом блоков, не декором."
+  ]
+}

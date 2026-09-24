@@ -1,0 +1,13 @@
+Vendored font families and their copyright notices (all SIL OFL 1.1;
+full license text in LICENSE-OFL-1.1.txt):
+
+- Inter — Copyright 2020 The Inter Project Authors (https://github.com/rsms/inter)
+- Source Serif 4 — Copyright 2014-2023 Adobe (http://www.adobe.com/),
+  with Reserved Font Name 'Source'
+- Unbounded — Copyright 2022 The Unbounded Project Authors
+  (https://github.com/googlefonts/unbounded)
+- JetBrains Mono — Copyright 2020 The JetBrains Mono Project Authors
+  (https://github.com/JetBrains/JetBrainsMono)
+
+Files: woff2 (rendering) and ttf (embedding into .pptx) subsets,
+latin+cyrillic. Obtained via Google Fonts / gwfh.mranftl.com.

@@ -1,0 +1,16 @@
+/* Grid Paper — tokens. Order: stage.css → this file → base.css. */
+:root {
+  --stage-bg: #101216;
+  --slide-bg: #ffffff;
+  --c-bg: #ffffff;
+  --c-surface: #f3f4f6;
+  --c-ink: #0b0b0c;
+  --c-muted: #63666b;
+  --c-accent: #2447f0;
+  --c-on-accent: #ffffff;
+  --c-line: rgba(11, 11, 12, 0.16);
+  --radius: 2px;
+  --f-display: "Unbounded", Arial, sans-serif;
+  --f-body: "Inter", Arial, sans-serif;
+  --f-mono: "JetBrains Mono", monospace;
+}

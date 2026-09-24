@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="ru">
+<head><meta charset="utf-8"><title>font-missing fixture</title>
+<style>
+{{CSS}}
+.rogue { font-family: "Comic Relief", sans-serif; }
+</style></head>
+<body>
+<div class="deck-viewport"><div class="deck-stage" id="deck-stage">
+  <section class="slide" data-role="content">
+    <div class="slide-pad">
+      <div class="slide-head">
+        <div class="kicker">Проверка</div>
+        <h2 class="headline">Незадекларированный шрифт</h2>
+      </div>
+      <div class="content">
+        <div class="card"><span class="t-title rogue">Чужое лицо</span><br><span class="t-body">Семья «Comic Relief» не объявлена через @font-face — экспорт подменит её при открытии.</span></div>
+        <div class="card ghost"><span class="t-body">Наполнитель для проверки наполненности слайда.</span></div>
+      </div>
+    </div>
+  </section>
+</div></div>
+</body>
+</html>

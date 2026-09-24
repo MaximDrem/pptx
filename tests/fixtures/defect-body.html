@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>defect fixture — every probe check must fire</title>
+<style>
+{{CSS}}
+</style>
+</head>
+<body>
+<div class="deck-viewport">
+  <div class="deck-stage" id="deck-stage">
+
+    <!-- 1: text-clip — fixed-height box, overflow hidden, long text -->
+    <section class="slide" data-role="content">
+      <div class="slide-pad">
+        <div class="slide-head">
+          <div class="kicker">Проверка</div>
+          <h2 class="headline">Обрезка текста</h2>
+        </div>
+        <div class="content">
+          <div style="height:60px;overflow:hidden;font-size:20px">
+            Этот абзац заведомо длиннее своей коробки и должен быть обрезан снизу — проверка text-clip обязана это увидеть и назвать.
+            Этот абзац заведомо длиннее своей коробки и должен быть обрезан снизу — проверка text-clip обязана это увидеть и назвать.
+          </div>
+          <div class="card ghost"><p>Наполнитель, чтобы слайд не выглядел пустым.</p></div>
+          <div class="card ghost"><p>Ещё один блок для баланса пустот.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2: out-of-bounds + low-contrast -->
+    <section class="slide" data-role="content">
+      <div class="slide-pad">
+        <div class="slide-head">
+          <div class="kicker">Проверка</div>
+          <h2 class="headline">Границы и контраст</h2>
+        </div>
+        <div class="content">
+          <div style="position:absolute;left:1200px;top:300px;width:300px;height:80px;background:var(--c-surface);padding:10px">
+            Блок вылезает за правый край слайда.
+          </div>
+          <p style="color:#F0F0F0;font-size:24px;max-width:50ch">
+            Почти белый текст на белом фоне — проверка low-contrast обязана это увидеть.
+          </p>
+          <div class="card ghost"><p>Наполнитель.</p></div>
+          <div class="card ghost"><p>Наполнитель.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3: empty-region (top heavy) + broken image -->
+    <section class="slide" data-role="content">
+      <div class="slide-pad">
+        <div class="slide-head">
+          <div class="kicker">Проверка</div>
+          <h2 class="headline">Пустой низ и битая картинка</h2>
+        </div>
+        <div class="content top">
+          <img src="does-not-exist.png" alt="broken" style="width:200px;height:120px">
+          <div class="card ghost"><p>Дальше слайд пустой.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4: blank -->
+    <section class="slide" data-role="content">
+      <div class="slide-pad"></div>
+    </section>
+
+  </div>
+</div>
+</body>
+</html>

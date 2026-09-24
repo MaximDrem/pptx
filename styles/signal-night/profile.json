@@ -1,0 +1,25 @@
+{
+  "id": "signal-night",
+  "name": "Signal Night",
+  "tone": "dark",
+  "mood": "confident, high-impact",
+  "best_for": ["strategy", "board decks", "pitch", "launch"],
+  "description": "Тёмный графит, крупные цифры, светящийся голубой акцент, акцентные карточки.",
+  "tokens": {
+    "bg": "#0C1220",
+    "surface": "#16202F",
+    "ink": "#F2F5F9",
+    "muted": "#93A1B3",
+    "accent": "#5EE0FF",
+    "onAccent": "#062430",
+    "line": "rgba(242,245,249,0.16)",
+    "stageBg": "#05070B"
+  },
+  "type": { "display": "Unbounded", "body": "Inter", "mono": "JetBrains Mono", "scale": [16, 20, 24, 38, 58] },
+  "bg": { "treatment": "solid" },
+  "rules": [
+    "Акцент — только для главного: цифра, слово, одна карточка.",
+    "Тёмный фон: тексты только из токенов (ink/muted), не белым по памяти.",
+    "Метрики крупно (.num), подписи — muted."
+  ]
+}

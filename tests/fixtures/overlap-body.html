@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>overlap fixture — наложения и слипшиеся зазоры</title>
+<style>
+{{CSS}}
+</style>
+</head>
+<body>
+<div class="deck-viewport">
+  <div class="deck-stage" id="deck-stage">
+
+    <!-- 1: два absolute-текста наложены -->
+    <section class="slide" data-role="content">
+      <div class="slide-pad">
+        <div class="slide-head">
+          <div class="kicker">Проверка</div>
+          <h2 class="headline">Наложение текста</h2>
+        </div>
+        <div class="content">
+          <div style="position:relative;flex:1">
+            <div style="position:absolute;left:60px;top:80px;font-size:26px;width:420px">Первый слой текста на этом месте</div>
+            <div style="position:absolute;left:140px;top:96px;font-size:26px;width:420px">Второй слой поверх первого</div>
+          </div>
+          <div class="card ghost"><span class="t-body">Наполнитель, чтобы слайд был контентным.</span></div>
+          <div class="card ghost"><span class="t-body">Ещё один блок для баланса.</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2: SVG-подпись налезает на HTML-текст -->
+    <section class="slide" data-role="content">
+      <div class="slide-pad">
+        <div class="slide-head">
+          <div class="kicker">Проверка</div>
+          <h2 class="headline">Наложение SVG-подписи</h2>
+        </div>
+        <div class="content">
+          <div class="chart" style="position:relative">
+            <svg viewBox="0 0 520 300" style="width:520px;height:300px">
+              <rect x="20" y="20" width="480" height="240" fill="#F3F4F6"/>
+              <text x="60" y="150" font-size="28" fill="#0B0B0C">Подпись графика поверх текста</text>
+            </svg>
+            <div style="position:absolute;left:56px;top:128px;font-size:24px;width:420px">Обычный HTML-текст под ней</div>
+          </div>
+          <div class="card ghost"><span class="t-body">Наполнитель.</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3: заголовок слипся со следующим блоком -->
+    <section class="slide" data-role="content">
+      <div class="slide-pad" style="gap:0">
+        <div class="slide-head" style="gap:0">
+          <div class="kicker">Проверка</div>
+          <h2 class="headline" style="margin-bottom:2px">Слипшийся заголовок</h2>
+        </div>
+        <div class="content top" style="padding-top:6px">
+          <p class="lead">Между заголовком и этим абзацем почти нет зазора.</p>
+          <div class="card ghost"><span class="t-body">Наполнитель.</span></div>
+          <div class="card ghost"><span class="t-body">Наполнитель.</span></div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</div>
+</body>
+</html>

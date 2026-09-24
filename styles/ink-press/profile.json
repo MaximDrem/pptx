@@ -1,0 +1,25 @@
+{
+  "id": "ink-press",
+  "name": "Ink Press",
+  "tone": "light",
+  "mood": "warm, thoughtful, editorial",
+  "best_for": ["reports", "brand stories", "research", "long-read summaries"],
+  "description": "Тёплая бумага, антиква в заголовках, тонкие линии, спокойный кирпичный акцент.",
+  "tokens": {
+    "bg": "#FAF6EF",
+    "surface": "#F1E9DC",
+    "ink": "#211A13",
+    "muted": "#6D6153",
+    "accent": "#B23A2F",
+    "onAccent": "#FDF9F3",
+    "line": "rgba(33,26,19,0.2)",
+    "stageBg": "#2A241D"
+  },
+  "type": { "display": "Source Serif 4", "body": "Inter", "mono": "JetBrains Mono", "scale": [16, 20, 24, 38, 58] },
+  "bg": { "treatment": "solid" },
+  "rules": [
+    "Антиква только в заголовках и цифрах; текст — Inter.",
+    "Тонкие линии и воздух; никаких заливок кроме surface и одного акцента.",
+    "Цитата на слайд — максимум 30 слов."
+  ]
+}

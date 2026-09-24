@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>merge-test-clean</title>
+<style>
+{{CSS}}
+</style>
+<style>
+  .slide { background: #0b0f1a; }
+  .box { position: absolute; background: #16202f; border: 1px solid #2a3a52; border-radius: 12px; padding: 18px 20px; color: #fff; font: 400 15px/1.35 Arial, sans-serif; }
+  .t-title { display: inline-block; width: 100%; font-weight: 700; font-size: 17px; color: #fff; margin: 0 0 6px; }
+  .t-body { display: inline-block; width: 100%; font-size: 14px; color: #a9b7c6; }
+  .badge { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: #62ecff; color: #062430; font-weight: 700; }
+</style>
+</head>
+<body>
+<div class="deck-viewport"><div class="deck-stage" id="deck-stage">
+  <section class="slide active" data-role="content">
+    <!-- O1: w100 runs + absolute badge -->
+    <div class="box" style="left:40px;top:60px;width:340px;height:170px">
+      <span class="badge" style="position:absolute;right:14px;top:14px">1</span><br><span class="t-title">O1 Заголовок</span><br><span class="t-body">w100-раны + абсолютный бейдж поверх.</span>
+    </div>
+    <!-- O2: w100 runs + badge grid child (после текста) -->
+    <div class="box" style="left:420px;top:60px;width:340px;height:170px">
+      <span class="t-title">O2 Заголовок</span><br><span class="t-body">w100-раны + бейдж-ребёнок grid.</span>
+      <span class="badge">2</span>
+    </div>
+    <!-- O3: w100 runs + ul child -->
+    <div class="box" style="left:800px;top:60px;width:340px;height:170px">
+      <span class="t-title">O3 Заголовок</span><br><span class="t-body">w100-раны + ul-ребёнок.</span>
+      <ul style="margin:6px 0 0;padding-left:18px"><li>Пункт</li></ul>
+    </div>
+    <!-- O4: w100 runs + b внутри строки -->
+    <div class="box" style="left:40px;top:280px;width:340px;height:170px">
+      <span class="t-title">O4 Заголовок</span><br><span class="t-body">Текст с <b>жирным словом</b> внутри рана.</span>
+    </div>
+    <!-- O5: несколько карточек сеткой, у каждой только w100-раны -->
+    <div class="box" style="left:420px;top:280px;width:340px;height:170px">
+      <span class="t-title">O5 Простой бокс</span><br><span class="t-body">Только раны — эталон склейки.</span>
+    </div>
+    <!-- O6: два p вместе с w100-ранами -->
+    <div class="box" style="left:800px;top:280px;width:340px;height:170px">
+      <span class="t-title">O6 Заголовок</span>
+      <p style="margin:0;color:#a9b7c6;font-size:14px">Параграф-ребёнок.</p>
+    </div>
+  </section>
+</div></div>
+</body>
+</html>
