@@ -76,6 +76,13 @@ function rendererEnv() {
 // → { ran, code, reason?, outDir, kept, post, report, inventory, artifacts }
 function renderDeck(deckPath, opts = {}) {
   const deck = path.resolve(deckPath);
+  // Managed style block: refresh it from the current skill files before
+  // rendering (idempotent, a no-op when the deck already carries the CSS).
+  try {
+    require("./expand-styles.cjs").expandDeck(deck);
+  } catch (e) {
+    return Promise.resolve({ ran: false, code: 2, reason: `styles expansion failed: ${e && e.message}` });
+  }
   const binary = process.env.GIGATOOL_NODE || process.env.MULTITOOL_NODE;
   if (!binary) {
     return Promise.resolve({ ran: false, code: null, reason: "GIGATOOL_NODE is not set — run inside the workspace app" });
@@ -154,10 +161,34 @@ function renderDeck(deckPath, opts = {}) {
       let post = null;
       let artifacts = [];
       // Parse the reports before the temp dir is removed: the HTML-level probe
-      // findings must survive even when nothing persistent was requested.
-      const report = finalCode === 0 ? readJson(path.join(outDir, "report.json")) : null;
-      const inventory = finalCode === 0 ? readJson(path.join(outDir, "inventory.json")) : null;
-      if (finalCode === 0 && opts.pptx) {
+      // findings must survive even when nothing persistent was requested, and
+      // they are still useful when the export was blocked (exit 4).
+      const report = readJson(path.join(outDir, "report.json"));
+      const inventory = readJson(path.join(outDir, "inventory.json"));
+      // Blocking issues must stop the export even when the app is older than
+      // the skill and did not gate it itself: never deliver a deck with
+      // hidden/clipped/overlapping slides.
+      const BLOCKING = new Set([
+        "text-clip",
+        "out-of-bounds",
+        "text-overlap",
+        "low-contrast",
+        "blank",
+        "broken-image",
+        "stage-broken",
+        "probe-error",
+        "hidden-slide",
+        "missing-br",
+      ]);
+      let effectiveCode = finalCode;
+      if (finalCode === 0 && (opts.pptx || opts.pdf) && report) {
+        const blocking = (report.slides || []).reduce((n, s) => n + (s.issues || []).filter((i) => BLOCKING.has(i.type)).length, 0);
+        if (blocking > 0) {
+          console.error(`render: ${blocking} blocking issue(s) — export skipped (fix deck.html and re-run; the .pptx is not delivered)`);
+          effectiveCode = 4;
+        }
+      }
+      if (effectiveCode === 0 && opts.pptx) {
         try {
           post = await postProcessPptx(outDir, deck);
           if (post && post.fixed) console.log(`pptx-post: ${post.fixed} межстрочных интервалов исправлено (exact → proportional)`);
@@ -165,7 +196,7 @@ function renderDeck(deckPath, opts = {}) {
           console.error("pptx-post: не удалось обработать .pptx: " + (e.message || e));
         }
       }
-      if (finalCode === 0) {
+      if (effectiveCode === 0) {
         try {
           artifacts = deliverArtifacts(outDir, deck, opts);
         } catch (e) {
@@ -173,7 +204,7 @@ function renderDeck(deckPath, opts = {}) {
         }
       }
       cleanup();
-      resolve({ ran: true, code: finalCode, outDir, kept: keep, post, report, inventory, artifacts });
+      resolve({ ran: true, code: effectiveCode, outDir, kept: keep, post, report, inventory, artifacts, reason: effectiveCode !== finalCode ? "blocking layout issues — export skipped" : undefined });
     });
   });
 }

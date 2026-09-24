@@ -205,6 +205,16 @@ function checkDeck(deck) {
     const tableStrings = flat.map(tableText).filter((t) => t.trim().length > 0);
     const tableChars = tableStrings.reduce((s, t) => s + t.trim().length, 0);
 
+    // --- 0. Слайд без единого элемента: он выпал из экспорта (display:none,
+    //        нулевой размер и т.п.).
+    if (!flat.length) {
+      errors.push({
+        slide: slide.index,
+        check: "empty-slide",
+        detail: "в .pptx на слайде нет ни одного элемента — слайд выпал при экспорте; проверь display:none и .active",
+      });
+    }
+
     // --- 1. Пустые залитые боксы (портируем empty_text_frame).
     const lids = [];
     for (const el of shapeBoxes) {
@@ -476,9 +486,18 @@ function mergeHtmlReport(rep, out) {
       n++;
       const detail = `слайд ${slide.index + 1}: ${issue.type}: ${issue.detail}`;
       if (
-        ["text-clip", "out-of-bounds", "text-overlap", "low-contrast", "blank", "broken-image", "stage-broken", "probe-error"].includes(
-          issue.type,
-        )
+        [
+          "text-clip",
+          "out-of-bounds",
+          "text-overlap",
+          "low-contrast",
+          "blank",
+          "broken-image",
+          "stage-broken",
+          "probe-error",
+          "hidden-slide",
+          "missing-br",
+        ].includes(issue.type)
       ) {
         out.errors.push({ slide: slide.index + 1, check: "html:" + issue.type, detail });
       } else {
@@ -507,6 +526,7 @@ async function main() {
   const abs = path.resolve(input);
   const out = { errors: [], warnings: [], info: [] };
   let htmlIssues = 0;
+  let htmlSlideCount = null;
 
   // 1. HTML-уровень: рендер и probe-отчёт. renderDeck returns the parsed
   //    report even when the temp dir was removed, so the probe findings are
@@ -521,6 +541,7 @@ async function main() {
     } else {
       const report = r.report || readJson(path.join(r.outDir || path.dirname(abs), "report.json"));
       htmlIssues = mergeHtmlReport(report, out);
+      if (report && Number.isFinite(report.slideCount)) htmlSlideCount = report.slideCount;
     }
   }
 
@@ -536,10 +557,23 @@ async function main() {
       out.info.push(...res.info);
       out.slideCount = res.slideCount;
       out.fonts = res.fonts;
+      // The render walked N slides; if the .pptx has fewer, some slides were
+      // dropped on export (display:none is the classic cause).
+      if (htmlSlideCount !== null && deck.totals.slides < htmlSlideCount) {
+        out.errors.push({
+          check: "slide-count-mismatch",
+          detail: `render saw ${htmlSlideCount} slide(s) but the .pptx has ${deck.totals.slides} — slides were dropped on export (check display:none / .active, probe hidden-slide)`,
+        });
+      }
     } catch (e) {
       out.errors.push({ check: "pptx-read", detail: "не удалось прочитать .pptx: " + (e.message || e) });
     }
-  } else if (!/\.html?$/i.test(abs)) {
+  } else if (/\.html?$/i.test(abs)) {
+    out.errors.push({
+      check: "pptx-missing",
+      detail: `рядом с deck.html нет .pptx (${path.basename(pptxPath)}): сборка не выполнялась или экспорт заблокирован — запусти index.cjs deck.html --pptx`,
+    });
+  } else {
     out.errors.push({ check: "input", detail: "нет .pptx для проверки: " + pptxPath });
   }
 

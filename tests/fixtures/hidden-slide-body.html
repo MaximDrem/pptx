@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ru">
+<head><meta charset="utf-8"><title>hidden-slide fixture</title>
+<style>
+{{CSS}}
+</style></head>
+<body>
+<div class="deck-viewport"><div class="deck-stage" id="deck-stage">
+  <section class="slide" data-role="content">
+    <div class="slide-pad">
+      <div class="slide-head">
+        <div class="kicker">Проверка</div>
+        <h2 class="headline wide">Видимый слайд</h2>
+      </div>
+      <div class="content">
+        <div class="card accent"><span class="t-body">Нормальный слайд с акцентом — движок его экспортирует.</span></div>
+      </div>
+      <div class="footer"><span>Проверка</span><span>01</span></div>
+    </div>
+  </section>
+  <section class="slide" data-role="content" style="display:none">
+    <div class="slide-pad">
+      <div class="slide-head">
+        <div class="kicker">Проверка</div>
+        <h2 class="headline wide">Скрытый слайд</h2>
+      </div>
+      <div class="content">
+        <div class="card"><span class="t-body">Этот слайд движок обязан считать выпавшим из экспорта.</span></div>
+      </div>
+      <div class="footer"><span>Проверка</span><span>02</span></div>
+    </div>
+  </section>
+</div></div>
+</body>
+</html>

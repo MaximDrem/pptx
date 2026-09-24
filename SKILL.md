@@ -6,20 +6,59 @@ previewDescription: Презентации (HTML → native PPTX)
 
 You build presentations as an **HTML deck** (`deck.html`) on a fixed 1280×720
 stage and export it to a **native .pptx** (real text, shapes, embedded fonts,
-notes). No npm, pip or downloads — everything is inside the skill. `deck.html`
-is the single source of truth: "fix slide 3" means edit the HTML and rebuild
-the .pptx.
+notes). `deck.html` is the single source of truth: "fix slide 3" means edit the
+HTML and rebuild the .pptx.
+
+## Non-negotiable rules
+
+Each of these has already broken a real deck. They are not style advice.
+
+1. **Only `helpers/index.cjs` builds the .pptx.**
+   There is no python, no node, no npm and no network in this environment;
+   `$GIGATOOL_NODE` is the only runtime and the helpers are the only builder.
+   Never write a python-pptx script, never shell out to LibreOffice, never use
+   an online converter or an npm package. Another builder = a failed task:
+   only this pipeline produces native text, embedded fonts and notes. If the
+   command does not work, say so and stop — do not improvise an alternative.
+2. **Work in the user's working folder.**
+   `deck.html` is created in the current working directory (the chat workspace)
+   and the `.pptx` lands next to it. Never build the deck in `/tmp` and never
+   create your own folders for it (e.g. `/tmp/folder`) — the user will not see
+   the result, and `lint-deck` fails a deck that lives in temp. Temp is only
+   for drafts and extracted media.
+3. **Never `display:none` a slide.**
+   Slides are hidden with `.active` (visibility/opacity) only. The export
+   engine silently drops `display:none` subtrees: a real deck lost 8 of its 10
+   slides that way. The probe reports `hidden-slide` and the export is blocked.
+4. **Never write the base CSS yourself.**
+   The skeleton has one managed block —
+   `<style data-presentation-style="signal-night"></style>` — and the builder
+   installs `stage.css` + `fonts/fonts.css` + `tokens.css` + `styles/_base.css`
+   into it on every run. Your own CSS goes into a separate `<style>` after it,
+   only for what the patterns do not cover. Hand-copied CSS drifts from the
+   contract (this is how slides disappeared).
+5. **Read before writing.**
+   Open `patterns.md` and `examples/example-deck.html` first: slides and blocks
+   come from there. Do not invent a layout while a verified pattern exists.
+6. **The render/validate loops are gates, not advice.**
+   `index.cjs deck.html --pptx` refuses to export while there are blocking
+   layout issues (exit 4, no `.pptx` is produced). `validate.cjs` errors block
+   delivery. Every content slide must have `elements > 0` and `coverage > 0` in
+   `inventory.json`. There is no "deliver anyway".
+7. **Do not change `stage.css`** — the 1280×720 stage is the export contract.
+   No emoji, no external URLs/CDNs, no font shrinking to hide overflow
+   (cut the text or switch the pattern), never delete `deck.html`.
 
 ## Result contract
 
 - The working folder keeps **exactly two files**: `<kebab-slug>.deck.html` and
   `<kebab-slug>.pptx`. Source images live in a subfolder (e.g. `images/`) if
   the user brought them; after the build they are embedded into the HTML.
-- No `deck.js`/`deck.ts`/build scripts in the result: HTML is the source.
+- No `deck.js`/`deck.ts`/`.py`/build scripts in the result: HTML is the source.
 - Reply to the user with absolute paths to the .pptx and .html plus a one-line
   summary.
 - Drafts, render folders and extracted media go to temp only, never into the
-  project.
+  project; the deck itself never lives in temp.
 
 ## Command (the only allowed runtime)
 
@@ -27,9 +66,10 @@ the .pptx.
 ELECTRON_RUN_AS_NODE=1 "$GIGATOOL_NODE" "$HOME/.wsc/config/skills/presentation/helpers/index.cjs" deck.html --pptx
 ```
 
-`index.cjs` runs lint → asset inlining → real render (PNG + reports) → export.
-If `$GIGATOOL_NODE` is not set, say the deck cannot be built outside the app
-and stop; do not substitute another interpreter and do not install anything.
+Run it from the working folder (or pass the absolute path to the deck). It
+does: styles expansion → asset inlining → lint → real render (PNG + reports) →
+export. If `$GIGATOOL_NODE` is not set, say the deck cannot be built outside
+the app and stop.
 
 Full helper list, report formats and diagnostics: `reference.md`.
 
@@ -53,7 +93,12 @@ understand the goal and the length.
 
 **A. Built-in styles** — `styles/index.json`: `grid-paper` (product/analytics),
 `ink-press` (reports/stories), `signal-night` (strategy/pitch). Pick by content
-type without asking; if the user named a style, use it.
+type without asking; if the user named a style, use it. The style is requested
+in the marker, the builder installs the tokens:
+
+```html
+<style data-presentation-style="signal-night"></style>
+```
 
 **B. Style of an attached deck:**
 
@@ -61,10 +106,9 @@ type without asking; if the user named a style, use it.
 ... style-profile.cjs "<path to attached .pptx>" --name "Style name"
 ```
 
-It reads `~/.wsc/config/styles/<slug>/`:
-- `tokens.css` — paste into the deck (after `stage.css`, before `_base.css`);
-- `assets/` — backgrounds/decor; use them as local images;
-- `profile.json` — principles (density, accent, fonts) and evidence.
+It writes `~/.wsc/config/styles/<slug>/`; reference it in the marker as
+`<style data-presentation-style="profile:<slug>"></style>`. The profile also
+has `assets/` (backgrounds/decor) and `profile.json` (principles + evidence).
 Replace a proprietary font from the sample with the nearest vendored face and
 say so in the reply.
 
@@ -91,9 +135,7 @@ For style reuse, media carry automatic roles and stats: `[background]`
 (dark/wide → good as a background), `[logo]`, `[decor]`, `[icon]`, `[photo]`,
 `[graphic]`, plus `avgColor/dark/saturated/hasAlpha`. Choose background/decor by
 role and stats — no eyes needed; take meaningful icons from Lucide
-(`icons.cjs --get`), meaningful pictures from chat generation. Role is purpose,
-not "what is drawn": for an unclear `[graphic]` ask the user or replace it with
-your own graphic.
+(`icons.cjs --get`), meaningful pictures from chat generation.
 
 ### 2. Plan the structure
 
@@ -103,7 +145,10 @@ is two slides. Never duplicate texts between slides.
 
 ### 3. Write deck.html
 
-Skeleton (CSS block order is mandatory):
+Use the minimal skeleton below (the managed style line + your slides). Open
+`examples/example-deck.html` as a markup reference — but do NOT copy it
+wholesale: its working copy carries expanded CSS (hundreds of KB) that you
+must not paste. Your deck stays small: styles come from the builder.
 
 ```html
 <!doctype html>
@@ -111,13 +156,8 @@ Skeleton (CSS block order is mandatory):
 <head>
 <meta charset="utf-8">
 <title>Title</title>
-<style>
-/* 1. stage.css — as is, never change */
-/* 2. fonts/fonts.css — as is */
-/* 3. styles/<chosen>/tokens.css or tokens.css from a profile */
-/* 4. styles/_base.css — as is */
-/* 5. only what is unique to this deck */
-</style>
+<style data-presentation-style="signal-night"></style>
+<style>/* optional: only what the patterns do not cover */</style>
 </head>
 <body>
 <div class="deck-viewport"><div class="deck-stage" id="deck-stage">
@@ -132,9 +172,8 @@ Skeleton (CSS block order is mandatory):
 
 Rules:
 
-- slides and blocks come from `patterns.md` (verified patterns and their
-  combinations); do not invent a new grid until you have tried the existing
-  ones;
+- slides and blocks come from `patterns.md`; do not invent a new grid until you
+  have tried the existing ones;
 - **one-box rule**: text inside a colored box is written as runs directly in
   the box (`.t-title/.t-body/.t-cap`, `<b>`, `<br>`) with nothing else in the
   box, so the .pptx has one editable shape; icons/badges go next to it via
@@ -156,25 +195,25 @@ Rules:
 - icons — `node helpers/icons.cjs --get <name>` (Lucide, not emoji);
 - images — local files (`<img src="images/...">`), not URLs; every image needs
   an `alt` (empty `alt=""` for decoration); generate pictures ONLY with a chat
-  tool (e.g. `gigachat_image`) before assembling; the deck itself cannot call
-  tools;
+  tool (e.g. `gigachat_image`) before assembling;
 - no external links/fonts/scripts (except our navigator) — the deck is offline;
 - write 8–14 slides in one pass; more — in two passes (skeleton + first slides,
   rebuild, then the rest).
 
-### 4. Render loop (mandatory)
+### 4. Render loop (mandatory gate)
 
 ```bash
-... index.cjs deck.html          # report + PNG + inventory, no pptx
+... index.cjs deck.html          # styles + assets + lint + render; no pptx
 ```
 
 Read the stdout lines (`slide N: TEXT-CLIPPED: …`) and the diagnostics table in
 `reference.md`, fix the HTML, repeat. Goal: `render: clean`. Typical beginner
 mistakes: fixed heights on text blocks, absolute positions, empty bottom of a
-slide, hex colors outside tokens, runs in a box not separated by `<br>`.
+slide, hex colors outside tokens, runs in a box not separated by `<br>`,
+`display:none` on slides.
 
-While the render is not clean, do not build the .pptx: the user would get the
-same defect.
+While the render is not clean, do not build the .pptx: the tool will refuse
+anyway (exit 4) and the user would get the same defect.
 
 ### 5. Export and self-reflection (mandatory loop)
 
@@ -184,16 +223,19 @@ same defect.
 ```
 
 `index.cjs deck.html --pptx` puts `<slug>.pptx` **next to deck.html** (and
-prints `artifact: <path>`); `--out-dir` is only needed to place artifacts
-elsewhere.
+prints `artifact: <path>`); `--out-dir` is only for special cases and takes the
+artifact away from the user's folder. The export is refused (exit 4) while
+blocking issues exist: clipped/overlapping/low-contrast text, blank or
+`display:none` slides, broken images, rows in a box not separated by `<br>`.
+Fix them and re-run — the .pptx simply does not exist until then.
 
 `validate.cjs` re-renders the deck and additionally checks the .pptx itself
 (empty placeholders, split "backdrop + separate textbox" pairs, WCAG AA run
 contrast, minimum font size, hierarchy, fullness, density, exact line spacing,
 placeholder texts, Russian typography, stage size, embedded fonts,
-`<a:normAutofit>`, notes and more). Work in a loop: fix → `validate` → fix
-until you see `validate: clean` (errors block delivery; warnings must at least
-be mentioned to the user). Then hand over the files.
+`<a:normAutofit>`, notes, empty slides and more). Work in a loop: fix →
+`validate` → fix until you see `validate: clean` (errors block delivery;
+warnings must at least be mentioned to the user).
 
 The result next to `deck.html` is `<slug>.pptx`: native text, shapes, embedded
 TTFs, notes. SVG charts become a vector group ("Convert to Shapes" works). If
@@ -209,10 +251,11 @@ error: replace the font first, then deliver.
 
 ## Hard bans
 
-- no `.ts/.js` decks and no npm/pip/curl;
+- no `.ts/.js/.py` decks or build scripts in the result, no npm/pip/curl;
 - no chat tools from HTML or helpers;
 - no emoji, external URLs, CDNs;
-- never change `stage.css` (the 1280×720 stage is the export contract);
+- no `display:none` on slides;
+- never change `stage.css`;
 - do not "fix" overflow by aggressively shrinking the font — first cut the
   text or switch the pattern;
 - do not delete `deck.html` after export — it is the source for edits.

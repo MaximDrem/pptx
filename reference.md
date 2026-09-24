@@ -1,6 +1,8 @@
 # reference.md — helpers, formats, diagnostics
 
-All commands run from the agent environment. Common template:
+All commands run from the agent environment **in the user's working folder**
+(the chat workspace): the deck and the .pptx must live there, temp is only for
+drafts and extracted media. Common template:
 
 ```bash
 ELECTRON_RUN_AS_NODE=1 "$GIGATOOL_NODE" "$HOME/.wsc/config/skills/presentation/helpers/<helper>.cjs" <args>
@@ -165,6 +167,7 @@ Two levels in one report:
 
 | Check | Catches |
 |---|---|
+| `empty-slide` | the slide has no elements at all in the .pptx — it fell out of the export (check `display:none` / `.active`) |
 | `empty-placeholder` | a filled placeholder with no text or content |
 | `split-box` | "backdrop + separate textbox" (text not written as runs in the box) |
 | `contrast` | run contrast: error < 3.0 (WCAG AA large text), warning < 4.5 (WCAG AA body); inheritance-aware and blending translucent fills |
@@ -181,10 +184,14 @@ Two levels in one report:
 | `embedded-fonts` | no embedded TTF in the .pptx while text exists |
 | `autofit` | `normAutofit` already shrinks text (fontScale < 100%) |
 | `slide-count`, `notes`, `image-coverage`, `repeated-words` | too few slides; notes; no pictures; word repetition |
+| `pptx-missing` | `validate.cjs deck.html` found no .pptx next to the deck | run `index.cjs deck.html --pptx`; the export is blocked until the render is clean |
+| `slide-count-mismatch` | the render saw more slides than the .pptx has — slides were dropped on export | find `display:none` / hidden slides, use `.active` |
 | `tight-line-spacing` | exact line spacing (the cause of overlap in PowerPoint; fixed by `pptx-post.cjs`) |
 
 Output: `validate: N error(s), M warning(s)` + `validate.json`; exit 1 when
 there are errors. The loop goal is `validate: clean` (info lines are fine).
+When a `deck.html` is passed, the `.pptx` next to it must exist — it is the
+delivery artifact, so a missing file is an error (`pptx-missing`).
 
 ## pptx-post.cjs — line-spacing treatment
 
@@ -200,23 +207,50 @@ proportional (back to the CSS percentage), and the overlap disappears. The
 font size is taken from the SAME paragraph as the spacing value. `render.cjs`
 calls it automatically after `--pptx`.
 
+## expand-styles.cjs — install the canonical CSS (managed block)
+
+```bash
+... expand-styles.cjs deck.html
+```
+
+The deck declares one managed block:
+
+```html
+<style data-presentation-style="signal-night"></style>
+```
+
+The helper replaces its content in place with `stage.css` + `fonts/fonts.css`
++ `tokens.css` + `styles/_base.css` (built-in id or `profile:<slug>`). Every
+run refreshes it from the current skill files; deck-authored `<style>` blocks
+are never touched; a deck without the marker is a no-op. This exists because
+the old workflow asked the model to copy ~900 lines of CSS by hand — weak
+models improvised their own layout (`display:none`, broken stage) and the
+export silently dropped slides. `index.cjs` and `render.cjs` call it
+automatically, so normally you never run it by hand.
+
 ## index.cjs — the whole pipeline in one command
 
 ```bash
 ... index.cjs deck.html [--pptx] [--pdf] [--no-png] [--out-dir <dir>]
 ```
 
-1. `lint-deck.cjs` — static errors (external URLs including `//host` and
-   `file:`, chat-tool calls, missing files, broken slides);
-2. `assets.cjs` — inlines fonts/images as data URIs;
-3. `render.cjs` — the real render: a PNG per slide, `report.json`,
+1. `expand-styles.cjs` — install the canonical CSS into the managed block;
+2. `assets.cjs` — inline fonts/images as data URIs;
+3. `lint-deck.cjs` — static errors (location, external URLs including `//host`
+   and `file:`, chat-tool calls, missing files, broken slides);
+4. `render.cjs` — the real render: a PNG per slide, `report.json`,
    `inventory.json`, issue lines on stdout;
-4. with `--pptx` / `--pdf` — native pptx and/or pdf; the finished files are
+5. with `--pptx` / `--pdf` — native pptx and/or pdf; the finished files are
    copied **next to deck.html** (`artifact: <path>`), `--out-dir` redirects
    them elsewhere.
 
-Exit: 0 — clean; 1 — lint/assets errors; 2 — render did not start; 3 — render
-crashed. Layout issues do not fail the command — they are lines to fix.
+Exit: 0 — clean; 1 — lint/assets/styles errors; 2 — render did not start;
+3 — render crashed; **4 — blocking layout issues: the export was skipped and
+no .pptx was produced**. Non-blocking issues are lines to fix, not failures.
+
+Blocking issue types: `text-clip`, `out-of-bounds`, `text-overlap`,
+`low-contrast`, `blank`, `broken-image`, `stage-broken`, `probe-error`,
+`hidden-slide`, `missing-br`.
 
 ## render.cjs — a standalone render run
 
@@ -245,7 +279,8 @@ Format: `{ "slides": [{ "index": 0, "issues": [{ "type": "...", "detail": "..." 
 | `blank` / `maybe-blank` | no text and no media on the slide | delete the duplicate or fill it with content |
 | `broken-image` | the image failed to render | check the path, run `assets.cjs` |
 | `img-no-alt` | an `<img>` has no `alt` attribute | add alt text (empty `alt=""` for decoration) |
-| `missing-br` | two text rows in one box are not separated by `<br>` | add `<br>` between the rows, otherwise PowerPoint shows one line |
+| `hidden-slide` | the slide is `display:none` or zero-sized — the export engine skips it (a real deck lost 8 of 10 slides this way) | hide slides with `.active` only; never `display:none` |
+| `missing-br` | two text rows in one box are not separated by `<br>` | add `<br>` between the rows — the export is blocked, PowerPoint would show one line |
 | `no-accent` | a content slide has no emphasis accent | highlight the key card/step/number/table row (see patterns.md, "Accent budget") |
 | `sparse-box` | a box taller than 180px is filled with text by less than 38% | shorten the box or add substance (see patterns.md, "Box fill") |
 | `stage-broken` | the stage is not 1280×720 | paste `stage.css` as is; do not resize it |
@@ -300,6 +335,8 @@ charts are snippets from `charts.md`. No libraries in the deck.
 | `GIGATOOL_NODE is not set` | running outside the app | tell the user; do not fake a render |
 | `render: failed to start` | the app is not built / wrong path | check `$GIGATOOL_NODE`, ask the user |
 | `render: timed out` | the deck hangs (endless JS) | remove scripts from the deck except the navigator |
+| `render: N blocking issue(s) — export skipped` (exit 4) | blocking layout defects: the .pptx was not produced | fix the listed issues, re-run; export only after a clean render |
+| `the deck is inside a temp directory` (lint) | the deck was built in `/tmp` — the user will not see it | build `deck.html` in the working folder |
 | `deck: FONT NOT LOADED` | the family is not vendored/declared | replace with a vendored face; `validate` raises `FONT NOT LOADED` |
 | `error FONT NOT LOADED` (validate) | font not vendored/declared | swap the token or add the face to `fonts/` |
 | `class(es) used but not defined` | a forgotten pattern/typo | check `patterns.md`, rerun lint |
@@ -326,7 +363,8 @@ presentation/            ← this folder (installed as ~/.wsc/config/skills/pres
 │   └── {grid-paper,ink-press,signal-night}/tokens.css + profile.json
 ├── fonts/               ← vendored woff2+ttf (OFL 1.1) + manifest.json
 ├── helpers/
-│   ├── index.cjs        ← lint + assets + render (+ pptx/pdf)
+│   ├── index.cjs        ← styles + lint + assets + render (+ pptx/pdf)
+│   ├── expand-styles.cjs ← installs the canonical CSS into the managed block
 │   ├── lint-deck.cjs    ├── assets.cjs   ├── render.cjs
 │   ├── validate.cjs     ├── pptx-post.cjs ├── refs.cjs
 │   ├── read-pptx.cjs    ├── style-profile.cjs ├── icons.cjs

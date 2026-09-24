@@ -10,6 +10,7 @@
 "use strict";
 
 const fs = require("fs");
+const os = require("os");
 const path = require("path");
 const { isData, isExternal, resolveRef } = require("./refs.cjs");
 
@@ -46,6 +47,21 @@ function lintDeck(deckPath, opts = {}) {
   const raw = fs.readFileSync(file, "utf8");
   const html = stripComments(raw);
   const deckDir = path.dirname(file);
+
+  // 0. Location contract: the deck lives in the user's working folder, never in
+  //    temp (drafts/extracted media may go to temp, the result must not).
+  const abs = path.resolve(file);
+  const tmp = os.tmpdir();
+  if (abs.startsWith(tmp + path.sep)) {
+    errors.push(
+      `the deck is inside a temp directory (${tmp}): the user will not see the result. ` +
+        `Build deck.html in the current working folder (${process.cwd()})`,
+    );
+  } else if (!abs.startsWith(path.resolve(process.cwd()) + path.sep)) {
+    warnings.push(
+      `the deck is outside the current working folder (${process.cwd()}) — the user expects the files there (deck: ${abs})`,
+    );
+  }
 
   // 1. Offline contract.
   const external = new Set();
@@ -118,7 +134,12 @@ function lintDeck(deckPath, opts = {}) {
   }
   const ignored = new Set(["lucide"]);
   const unknown = Array.from(used).filter((c) => !defined.has(c) && !ignored.has(c));
-  if (unknown.length && styleBlocks.length) {
+  const managedEmpty = /<style\b[^>]*\bdata-presentation-style=(["'])[^"']*\1[^>]*>\s*<\/style>/i.test(raw);
+  if (managedEmpty) {
+    warnings.push(
+      "the managed style block is empty — run index.cjs / expand-styles.cjs; it installs stage.css, tokens and _base.css automatically",
+    );
+  } else if (unknown.length && styleBlocks.length) {
     warnings.push(
       "class(es) used but not defined in the deck's <style> (silent fallback — typo or missing paste): " +
         unknown.slice(0, 12).join(", ") +

@@ -26,6 +26,7 @@ density).
 | Text overlap | line-level detector (Range API + SVG labels) in probe + `TIGHT-GAP`; found and fixed a real export overlap (exact line spacing) | ✅ |
 | Artifact validation | `validate.cjs`: ports of the python checks (empty placeholders, split-box, WCAG contrast, hierarchy, fullness, density, repetition, notes) + font size, placeholders, typography, stage size, native text/fonts, normAutofit — plus a `validate.json` report | ✅ |
 | .pptx post-processing | `pptx-post.cjs`: exact→proportional line spacing (37 fixes per deck), PDF render without overlaps | ✅ |
+| Contract guards | `expand-styles` (managed CSS block), `hidden-slide`/`missing-br`/`no-accent`/`sparse-box` probe checks, export blocked on blocking issues (exit 4, no .pptx), temp-dir decks refused, `slide-count-mismatch` | ✅ |
 
 Local acceptance run: `node tests/local/run-local.cjs` (Chrome required;
 the LibreOffice check is optional).
@@ -33,15 +34,23 @@ the LibreOffice check is optional).
 ## Architecture
 
 ```
-deck.html ──┬─ lint-deck.cjs    static checks (offline, files, classes)
+deck.html ──┬─ expand-styles.cjs  canonical CSS into the managed style block
             ├─ assets.cjs       inline fonts/images as data URIs
+            ├─ lint-deck.cjs    static checks (location, offline, files, classes)
             ├─ render.cjs ──► app --deck-render (Electron, off-screen)
             │                   ├─ probe.js (metrics + inventory)
             │                   ├─ slide-NN.png, report.json, inventory.json
-            │                   └─ dom-to-pptx.bundle.js → <slug>.pptx
+            │                   └─ dom-to-pptx.bundle.js → <slug>.pptx (blocked on
+            │                      blocking issues: exit 4, no export)
             └─ read-pptx.cjs / style-profile.cjs   (input: someone else's .pptx)
 ```
 
+- **The model never copies the CSS.** The deck carries one managed block
+  (`<style data-presentation-style="signal-night">`…) and the builder installs
+  `stage.css` + `fonts.css` + tokens + `_base.css` on every run; deck-authored
+  CSS lives in a separate block. This is what keeps weak models on the
+  contract (the old copy-by-hand workflow produced `display:none` decks that
+  the exporter dropped).
 - **HTML is the source of truth.** Edits = HTML edits; the .pptx is rebuilt.
 - **Layout is measured, not guessed.** The exporter does not "understand"
   flex/grid; it takes the final `x/y/w/h` of every element from Chromium — so
@@ -52,13 +61,19 @@ deck.html ──┬─ lint-deck.cjs    static checks (offline, files, classes)
 
 ## Contracts that must not be broken
 
+- the working folder keeps the deck and the .pptx: decks live in the chat
+  workspace, never in `/tmp` (`lint-deck` fails a deck in temp);
 - the stage is exactly 1280×720 (= 13.333×7.5in = 96dpi): PNG and PDF are
   slide-for-slide;
 - slides are `<section class="slide">`, visibility via `.active` (not
-  `display:none`);
+  `display:none` — the export engine skips such slides);
+- the canonical CSS lives in the managed block
+  (`<style data-presentation-style="…">`), installed by `expand-styles.cjs`;
 - notes — `<template data-pptx-notes>` inside the slide;
 - fonts — vendored only (`fonts/`); hex colors — only in tokens;
 - every row inside a filled box is separated by `<br>` (one-box rule);
+- the export is blocked (exit 4) while blocking layout issues exist, so an
+  empty/broken deck cannot be delivered;
 - no internet and no chat tools inside the deck/helpers.
 
 ## Provenance and licenses

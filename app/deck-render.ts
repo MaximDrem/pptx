@@ -250,6 +250,29 @@ async function run(
     )
     writeFileSync(inventoryPath, JSON.stringify({ file: deck, slides: inventory }, null, 2))
 
+    // Blocking layout issues stop the export: a deck with hidden, clipped or
+    // overlapping slides must be fixed first. Exit 4 — the .pptx is not
+    // produced at all, so an empty/broken deck cannot be delivered.
+    const BLOCKING = new Set([
+      "text-clip",
+      "out-of-bounds",
+      "text-overlap",
+      "low-contrast",
+      "blank",
+      "broken-image",
+      "stage-broken",
+      "probe-error",
+      "hidden-slide",
+      "missing-br",
+    ])
+    if (opts.pptx || opts.pdf) {
+      const blocking = domReports.reduce((n, r) => n + (r.issues ?? []).filter((i) => BLOCKING.has(i.type)).length, 0)
+      if (blocking > 0) {
+        console.log(`render: ${blocking} blocking issue(s) — export skipped. Fix deck.html and re-run; export only after a clean render.`)
+        exit(4)
+      }
+    }
+
     if (opts.pptx) {
       const prep = (await js("window.__deckProbe.exportPrep()")) as { slides: number; notes: number }
       await js(readFileSync(join(opts.vendorDir as string, "dom-to-pptx.bundle.js"), "utf8"))

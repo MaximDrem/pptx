@@ -4,19 +4,22 @@
 //   ELECTRON_RUN_AS_NODE=1 "$GIGATOOL_NODE" "$HOME/.wsc/config/skills/presentation/helpers/index.cjs" \
 //     deck.html [--pptx] [--pdf] [--no-png] [--out-dir <dir>]
 //
-//   1. lint-deck.cjs   static preflight (offline contract, files, markup)
-//   2. assets.cjs      inline vendored fonts/images so the deck is standalone
-//   3. render.cjs      real Chromium render: captures + report.json + inventory.json
-//   4. --pptx/--pdf    native .pptx (dom-to-pptx) and one-slide-per-page PDF
+//   1. expand-styles.cjs  install the canonical CSS into the managed
+//                         <style data-presentation-style="…"> block
+//   2. assets.cjs         inline vendored fonts/images so the deck is standalone
+//   3. lint-deck.cjs      static preflight (offline contract, files, markup)
+//   4. render.cjs         real Chromium render: captures + report.json + inventory.json
+//   5. --pptx/--pdf       native .pptx (dom-to-pptx) and one-slide-per-page PDF
 //
-// Exit codes: 0 clean · 1 lint/assets errors · 2 render failed to start ·
-// 3 render/export crashed. Layout issues do NOT fail the run: they are lines
-// in stdout for the model to fix.
+// Exit codes: 0 clean · 1 lint/assets/styles errors · 2 render failed to start ·
+// 3 render/export crashed · 4 blocking layout issues — export skipped.
+// Non-blocking issues do NOT fail the run: they are lines in stdout to fix.
 "use strict";
 
 const { execFileSync } = require("child_process");
 const path = require("path");
 const { renderDeck } = require("./render.cjs");
+const { expandDeck } = require("./expand-styles.cjs");
 
 async function main() {
   const argv = process.argv.slice(2);
@@ -32,6 +35,23 @@ async function main() {
   }
   const absDeck = path.resolve(deck);
 
+  // The managed style block is expanded first: the model never copies the
+  // canonical CSS by hand, so the stage/one-box contract cannot drift.
+  try {
+    const s = expandDeck(absDeck);
+    if (s.expanded) console.log(`styles: expanded "${s.style}" (managed block)`);
+  } catch (e) {
+    console.error("index: styles expansion failed: " + (e && e.message));
+    process.exit(1);
+  }
+
+  try {
+    execFileSync(process.execPath, [path.join(__dirname, "assets.cjs"), absDeck], { stdio: "inherit", timeout: 120000 });
+  } catch (e) {
+    console.error("index: assets.cjs failed — fix missing files or paths and re-run");
+    process.exit(1);
+  }
+
   if (!argv.includes("--no-lint")) {
     try {
       execFileSync(process.execPath, [path.join(__dirname, "lint-deck.cjs"), absDeck], { stdio: "inherit", timeout: 120000 });
@@ -39,12 +59,6 @@ async function main() {
       console.error("index: lint-deck found blocking errors — fix them and re-run");
       process.exit(1);
     }
-  }
-  try {
-    execFileSync(process.execPath, [path.join(__dirname, "assets.cjs"), absDeck], { stdio: "inherit", timeout: 120000 });
-  } catch (e) {
-    console.error("index: assets.cjs failed — fix missing files or paths and re-run");
-    process.exit(1);
   }
 
   const r = await renderDeck(absDeck, {

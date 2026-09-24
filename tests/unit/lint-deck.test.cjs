@@ -32,6 +32,7 @@ fs.writeFileSync(
 
 const res = lintDeck(file, { quiet: true });
 const errors = res.errors.join("\n");
+assert.ok(errors.includes("inside a temp directory"), "a deck in a temp dir must be an error (the user will not see it)");
 assert.ok(errors.includes("//evil.example/x.png"), "protocol-relative ref must be an error");
 assert.ok(errors.includes("file:/etc/passwd"), "file: ref must be an error");
 assert.ok(errors.includes("https://cdn.example/y.png"), "http(s) ref must stay an error");

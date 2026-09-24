@@ -28,12 +28,32 @@ fs.writeFileSync(path.join(out, "report.json"), JSON.stringify({
   file: deck,
   slideCount: 1,
   fontsMissing: ["Missing Face"],
-  slides: [{ index: 0, issues: [{ type: "text-clip", detail: "overflow" }] }],
+  slides: [{ index: 0, issues: [{ type: "img-no-alt", detail: "1 image without alt" }] }],
 }));
 fs.writeFileSync(path.join(out, "inventory.json"), JSON.stringify({ slides: [] }));
 const base = path.basename(deck).replace(/\\.html?$/i, "");
 // A real (minimal) zip so pptx-post can process it.
 const PPTX_B64 = "UEsDBAoAAAAAAM4xOF0AAAAAAAAAAAAAAAAEAAAAcHB0L1BLAwQKAAAAAADOMThdAAAAAAAAAAAAAAAACwAAAHBwdC9zbGlkZXMvUEsDBAoAAAAIAM4xOF0l+eitCgAAAAgAAAAVAAAAcHB0L3NsaWRlcy9zbGlkZTEueG1ssymwKs5J0bcDAFBLAQIUAAoAAAAAAM4xOF0AAAAAAAAAAAAAAAAEAAAAAAAAAAAAEAAAAAAAAABwcHQvUEsBAhQACgAAAAAAzjE4XQAAAAAAAAAAAAAAAAsAAAAAAAAAAAAQAAAAIgAAAHBwdC9zbGlkZXMvUEsBAhQACgAAAAgAzjE4XSX56K0KAAAACAAAABUAAAAAAAAAAAAAAAAASwAAAHBwdC9zbGlkZXMvc2xpZGUxLnhtbFBLBQYAAAAAAwADAK4AAACIAAAAAAA=";
+if (process.env.STUB_BLOCKING_REPORT === "1") {
+  // An older app exits 0 and exports anyway; the helper must still gate it.
+  fs.writeFileSync(path.join(out, "report.json"), JSON.stringify({
+    file: deck,
+    slideCount: 2,
+    fontsMissing: [],
+    slides: [{ index: 1, issues: [{ type: "hidden-slide", detail: "slide is display:none" }] }],
+  }));
+}
+if (process.env.STUB_BLOCK === "1") {
+  // Mirrors the app: blocking findings in report.json, export refused (exit 4).
+  fs.writeFileSync(path.join(out, "report.json"), JSON.stringify({
+    file: deck,
+    slideCount: 2,
+    fontsMissing: [],
+    slides: [{ index: 1, issues: [{ type: "hidden-slide", detail: "slide is display:none" }] }],
+  }));
+  console.log("render: 2 blocking issue(s) — export skipped.");
+  process.exit(4);
+}
 if (argv.includes("--pptx")) fs.writeFileSync(path.join(out, base + ".pptx"), Buffer.from(PPTX_B64, "base64"));
 console.log("render: clean");
 `;
@@ -54,7 +74,7 @@ async function main() {
   assert.strictEqual(r1.code, 0, "stub exits 0");
   assert.ok(r1.report, "report must be parsed before the temp dir is removed");
   assert.deepStrictEqual(r1.report.fontsMissing, ["Missing Face"], "fontsMissing must travel in report.json");
-  assert.strictEqual(r1.report.slides[0].issues[0].type, "text-clip", "probe findings must survive");
+  assert.strictEqual(r1.report.slides[0].issues[0].type, "img-no-alt", "probe findings must survive");
   assert.ok(r1.inventory, "inventory must be parsed before cleanup");
   assert.ok(!fs.existsSync(r1.outDir), "temp dir is removed when nothing persistent is requested");
 
@@ -70,6 +90,29 @@ async function main() {
   const r3 = await renderDeck(deck, { pptx: true, outDir });
   assert.ok(fs.existsSync(path.join(outDir, "unit.deck.pptx")), "pptx must exist in --out-dir");
   assert.deepStrictEqual(r3.artifacts, [], "explicit --out-dir must suppress the copy");
+
+  // 4. blocking issues: the app refuses to export (exit 4) and no artifact is
+  //    delivered; the report is still available to the caller.
+  process.env.STUB_BLOCK = "1";
+  const blockedDeck = path.join(dir, "blocked.deck.html");
+  fs.writeFileSync(blockedDeck, "<!doctype html><html><body></body></html>");
+  const r4 = await renderDeck(blockedDeck, { pptx: true });
+  delete process.env.STUB_BLOCK;
+  assert.strictEqual(r4.code, 4, "blocked export must surface exit code 4");
+  assert.deepStrictEqual(r4.artifacts, [], "no artifacts when the export is blocked");
+  assert.ok(r4.report, "report must still be parsed on exit 4");
+  assert.ok(!fs.existsSync(path.join(dir, "blocked.deck.pptx")), "no .pptx next to the deck");
+
+  // 5. A blocking finding in report.json blocks delivery even when the app
+  //    exits 0 (apps older than the skill do not gate the export themselves).
+  process.env.STUB_BLOCKING_REPORT = "1";
+  const softDeck = path.join(dir, "soft-block.deck.html");
+  fs.writeFileSync(softDeck, "<!doctype html><html><body></body></html>");
+  const r5 = await renderDeck(softDeck, { pptx: true });
+  delete process.env.STUB_BLOCKING_REPORT;
+  assert.strictEqual(r5.code, 4, "helper must surface exit 4 for blocking findings");
+  assert.deepStrictEqual(r5.artifacts, [], "no artifacts copied when the helper blocks");
+  assert.ok(!fs.existsSync(path.join(dir, "soft-block.deck.pptx")), "no .pptx next to the deck");
 
   console.log("PASS  render: отчёт переживает очистку temp, артефакты кладутся рядом с deck.html");
 }

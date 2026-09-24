@@ -428,6 +428,16 @@
     };
 
     const slideRect = slide.getBoundingClientRect();
+
+    // A display:none (or zero-sized) slide is invisible to the export engine:
+    // it is silently dropped from the .pptx (real incident: 8 of 10 slides
+    // vanished). Slides must be hidden with .active only.
+    const slideDisplay = getComputedStyle(slide).display;
+    if (slideDisplay === "none" || slideRect.width < 2 || slideRect.height < 2) {
+      push("hidden-slide", "slide is display:none or zero-sized — the export engine skips it; hide slides with .active, never display:none");
+      return { index, issues };
+    }
+
     const descendants = Array.from(slide.querySelectorAll("*")).filter((el) => el instanceof HTMLElement);
     const slideArea = slideRect.width * slideRect.height;
     const role = slide.dataset.role || "content";

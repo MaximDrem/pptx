@@ -58,7 +58,7 @@ async function main() {
 
   // 1b. Pure-node unit tests (no browser): pptx-post offset, artifact checks,
   //     render report/artifact contract.
-  for (const unit of ["pptx-post.test.cjs", "validate-checks.test.cjs", "render-report.test.cjs", "lint-deck.test.cjs"]) {
+  for (const unit of ["pptx-post.test.cjs", "validate-checks.test.cjs", "render-report.test.cjs", "lint-deck.test.cjs", "expand-styles.test.cjs"]) {
     const u = spawnSync(process.execPath, [path.join(__dirname, "..", "unit", unit)], { encoding: "utf8", timeout: 60000 });
     const tail = ((u.stdout || "") + (u.stderr || "")).trim().split("\n").pop() || "";
     record(`unit ${unit}`, u.status === 0, tail.slice(0, 180));
@@ -98,6 +98,14 @@ async function main() {
       /NO-ACCENT/.test(asout) && /SPARSE-BOX/.test(asout),
       asout.includes("NO-ACCENT") && asout.includes("SPARSE-BOX") ? "ok" : "not reported",
     );
+  }
+
+  // 2e. Слайд, скрытый через display:none, движок молча выбрасывает.
+  {
+    const hsDeck = assemble("hidden-slide-body.html");
+    const hsrun = runHarness(["probe", hsDeck]);
+    const hsout = (hsrun.stdout || "") + (hsrun.stderr || "");
+    record("probe: display:none слайд ловится", /HIDDEN-SLIDE/.test(hsout), hsout.includes("HIDDEN-SLIDE") ? "ok" : "not reported");
   }
 
   // 3. defect fixture: every issue type must fire.
