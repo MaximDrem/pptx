@@ -194,6 +194,24 @@ Use the minimal skeleton (managed style line + your slides). Open
 `examples/example-deck.html` as a markup reference — but do NOT copy it
 wholesale: its working copy carries expanded CSS that you must not paste.
 
+**Write the whole deck in ONE write call** (all 8–14 slides at once). Do not
+assemble it slide-by-slide with edit calls — that is exactly how agents get
+stuck on "Found multiple matches for oldString" and burn the turn. The deck
+source is small (tens of KB): rewriting it completely is always cheaper than
+surgical inserts.
+
+If an edit tool still reports an ambiguous anchor — **do not ask the user
+about tool mechanics, recover yourself**:
+
+1. read `deck.html` (it is small);
+2. either anchor on something unique — the footer of the previous slide
+   (`<div class="footer"><span>Section</span><span>NN</span></div>` — the
+   numbering exists exactly for this) — or
+3. rewrite the whole file in one write call with the missing slides added.
+
+Never leave a half-built deck behind: "continue later" means the next call
+rewrites the complete file.
+
 ```html
 <!doctype html>
 <html lang="ru">
@@ -334,7 +352,10 @@ verify estimated numbers, and on "fix slide N" — edit `deck.html`, rebuild.
   decor) whenever the profile has any — a "copy" with zero original elements
   is a failed copy;
 - do not "fix" overflow by shrinking the font;
-- do not delete `deck.html` after export.
+- do not delete `deck.html` after export;
+- do not ask the user about editor/tool mechanics (ambiguous anchors, failed
+  edits, formatting) — read the file and recover yourself: unique anchor or
+  full rewrite.
 
 ## Files
 

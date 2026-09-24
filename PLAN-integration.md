@@ -13,7 +13,7 @@ BrowserWindow, which already exists in production for `--pptx-verify`.
 | From (this repository) | To (desktop-ai-app) |
 |---|---|
 | `presentation_v3/*` | `packages/desktop-electron/resources/defaults/skills/presentation/` (delete the folder and replace it entirely) |
-| `presentation_v3/.bundle-version` (= 45) | already inside the folder above |
+| `presentation_v3/.bundle-version` (= 46) | already inside the folder above |
 | `presentation_v3/app/deck-render.ts` | `src/main/deck-render.ts` |
 | the detector from `deck-render.ts` (`isRunDeckRender`) | `src/main/deck-render-check.ts` (mirroring `pptx-verify-check.ts`) |
 
@@ -24,7 +24,7 @@ cp -r /path/to/presentation_v3 packages/desktop-electron/resources/defaults/skil
 git add packages/desktop-electron/resources/defaults/skills/presentation
 ```
 
-Verify `.bundle-version` = `45` (the currently installed one = 35; when the
+Verify `.bundle-version` = `46` (the currently installed one = 35; when the
 number increases, `seed-defaults.ts` deletes the user's folder and re-seeds it
 entirely — the old skill rolls out by itself).
 
@@ -96,7 +96,7 @@ as in `--pptx-verify`.
 
 `presentation` is already in `versionStampedSkills` (the line exists in the
 current version) — no code change is needed, only the new
-`.bundle-version = 45`. If the line is actually missing, add it following the
+`.bundle-version = 46`. If the line is actually missing, add it following the
 neighboring skills.
 
 ### 2.5 Packaging

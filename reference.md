@@ -418,6 +418,7 @@ so an unreviewed dirty deck cannot slip through.
 | `warn NO-ACCENT` | a content slide has nothing accented | highlight the key block (patterns.md, "Accent budget") |
 | `warn SPARSE-BOX` | a tall box is nearly empty | shorten the box or add substance |
 | `probe: N issue(s)` | see the type table | fix one by one, rerender |
+| `Found multiple matches for oldString` (edit tool) | building the deck slide-by-slide with repeated anchors | do not ask the user: read `deck.html`, anchor on the previous slide's footer (`<span>NN</span>`) or rewrite the whole file in one write call |
 
 ## Skill files
 

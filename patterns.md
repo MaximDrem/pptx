@@ -12,7 +12,9 @@ Rules shared by all patterns:
 - `data-role`: `cover | section | content | quote | closing`. Emptiness checks
   depend on the role;
 - footer: `<div class="footer"><span>Section</span><span>NN</span></div>` —
-  the last element of `.slide-pad`;
+  the last element of `.slide-pad`; the `NN` numbering also makes every
+  slide block uniquely addressable when editing (anchor on the previous
+  slide's footer; see SKILL step 3);
 - heading: `.kicker` + `.headline` (`.xl` for cover/section, `.wide` for long
   headings);
 - speaker notes: `<template data-pptx-notes>text</template>` — hidden on the
