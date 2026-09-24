@@ -31,6 +31,9 @@ fs.writeFileSync(path.join(out, "report.json"), JSON.stringify({
   slides: [{ index: 0, issues: [{ type: "img-no-alt", detail: "1 image without alt" }] }],
 }));
 fs.writeFileSync(path.join(out, "inventory.json"), JSON.stringify({ slides: [] }));
+// build-copy check: relative refs must be resolvable next to the deck
+const refImg = path.join(path.dirname(deck), "images", "px.png");
+fs.writeFileSync(path.join(out, "saw-image.txt"), fs.existsSync(refImg) ? "yes" : "no");
 const base = path.basename(deck).replace(/\\.html?$/i, "");
 // A real (minimal) zip so pptx-post can process it.
 const PPTX_B64 = "UEsDBAoAAAAAAM4xOF0AAAAAAAAAAAAAAAAEAAAAcHB0L1BLAwQKAAAAAADOMThdAAAAAAAAAAAAAAAACwAAAHBwdC9zbGlkZXMvUEsDBAoAAAAIAM4xOF0l+eitCgAAAAgAAAAVAAAAcHB0L3NsaWRlcy9zbGlkZTEueG1ssymwKs5J0bcDAFBLAQIUAAoAAAAAAM4xOF0AAAAAAAAAAAAAAAAEAAAAAAAAAAAAEAAAAAAAAABwcHQvUEsBAhQACgAAAAAAzjE4XQAAAAAAAAAAAAAAAAsAAAAAAAAAAAAQAAAAIgAAAHBwdC9zbGlkZXMvUEsBAhQACgAAAAgAzjE4XSX56K0KAAAACAAAABUAAAAAAAAAAAAAAAAASwAAAHBwdC9zbGlkZXMvc2xpZGUxLnhtbFBLBQYAAAAAAwADAK4AAACIAAAAAAA=";
@@ -120,15 +123,19 @@ async function main() {
     "base64",
   );
   fs.writeFileSync(path.join(dir, "px.png"), px);
+  fs.mkdirSync(path.join(dir, "images"), { recursive: true });
+  fs.writeFileSync(path.join(dir, "images", "px.png"), px);
   const srcDeck = path.join(dir, "clean.deck.html");
   fs.writeFileSync(
     srcDeck,
-    '<!doctype html><html><body><div class="deck-stage" id="deck-stage"><section class="slide" data-role="content"><img src="px.png" alt="">text</section></div></body></html>',
+    '<!doctype html><html><body><div class="deck-stage" id="deck-stage"><section class="slide" data-role="content"><img src="images/px.png" alt="">text</section></div></body></html>',
   );
-  const r6 = await renderDeck(srcDeck, {});
+  const out6 = path.join(dir, "clean-out");
+  const r6 = await renderDeck(srcDeck, { outDir: out6 });
   assert.strictEqual(r6.ran, true);
   assert.ok(!fs.readFileSync(srcDeck, "utf8").includes("data:image"), "authored deck.html must stay free of data URIs");
-  assert.ok(fs.readFileSync(srcDeck, "utf8").includes('src="px.png"'), "relative refs stay in the source");
+  assert.ok(fs.readFileSync(srcDeck, "utf8").includes('src="images/px.png"'), "relative refs stay in the source");
+  assert.strictEqual(fs.readFileSync(path.join(out6, "saw-image.txt"), "utf8"), "yes", "the build copy must carry referenced images");
 
   console.log("PASS  render: отчёт переживает очистку temp, артефакты кладутся рядом с deck.html");
 }

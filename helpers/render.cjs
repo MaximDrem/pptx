@@ -87,6 +87,24 @@ function renderDeck(deckPath, opts = {}) {
     buildDir = fs.mkdtempSync(path.join(os.tmpdir(), "deck-build-"));
     buildDeck = path.join(buildDir, path.basename(deck));
     fs.copyFileSync(deck, buildDeck);
+    // Relative refs (images/…, assets/…) must resolve in the build copy too —
+    // without this the renderer saw BROKEN-IMAGE for every local picture.
+    try {
+      const { collectRefs, isData, isExternal, resolveRef } = require("./refs.cjs");
+      const deckDir = path.dirname(deck);
+      for (const { ref } of collectRefs(fs.readFileSync(deck, "utf8"))) {
+        if (isData(ref) || isExternal(ref)) continue;
+        const { found } = resolveRef(deckDir, ref);
+        if (!found) continue; // lint reports missing files
+        const rel = path.relative(deckDir, found);
+        if (rel.startsWith("..")) continue; // outside the working folder
+        const dest = path.join(buildDir, rel);
+        fs.mkdirSync(path.dirname(dest), { recursive: true });
+        fs.copyFileSync(found, dest);
+      }
+    } catch {
+      // best-effort: a missing ref is lint's job, not the builder's
+    }
     require("./expand-styles.cjs").expandDeck(buildDeck);
     require("./assets.cjs").inlineAssets(buildDeck, { inline: true, quiet: true });
   } catch (e) {

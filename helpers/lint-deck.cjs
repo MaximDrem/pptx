@@ -12,31 +12,11 @@
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
-const { isData, isExternal, resolveRef } = require("./refs.cjs");
+const { isData, isExternal, resolveRef, collectRefs } = require("./refs.cjs");
 
 const SESSION_TOOL_RE = /(?<![.\w])(gigachat_image|text2image|generate_image|image_generation|web_search|websearch)\s*\(/g;
 
 const stripComments = (html) => html.replace(/<!--[\s\S]*?-->/g, "").replace(/\/\*[\s\S]*?\*\//g, "");
-
-function collectRefs(html) {
-  const refs = [];
-  const push = (ref, kind) => {
-    if (!ref) return;
-    const r = ref.trim();
-    if (!r || isData(r)) return;
-    refs.push({ ref: r, kind });
-  };
-  let m;
-  const urlRe = /url\((["']?)([^)"']+)\1\)/g;
-  while ((m = urlRe.exec(html))) push(m[2], "url");
-  const imgRe = /<img\b[^>]*?\bsrc=(["'])([^"']+)\1/gi;
-  while ((m = imgRe.exec(html))) push(m[2], "img");
-  const scriptRe = /<script\b[^>]*?\bsrc=(["'])([^"']+)\1/gi;
-  while ((m = scriptRe.exec(html))) push(m[2], "script");
-  const linkRe = /<link\b[^>]*?\bhref=(["'])([^"']+)\1/gi;
-  while ((m = linkRe.exec(html))) push(m[2], "link");
-  return refs;
-}
 
 function lintDeck(deckPath, opts = {}) {
   const errors = [];

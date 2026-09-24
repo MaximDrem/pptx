@@ -324,6 +324,22 @@ be fixed) or `suggestion:` (taste — judge visually). The loop is:
    deck visibly better;
 4. **repeat** until there are no `error:` lines AND your eyes agree.
 
+Common error → fix (never invent a workaround, never hand files to the user
+to edit):
+
+- `BROKEN-IMAGE`: the file is missing or misnamed — copy it next to the deck
+  (`images/…`); `./images/x` and `images/x` are the same thing, do not "fix"
+  paths; fix ALL slides with that file at once;
+- `LOW-CONTRAST`: body text uses `.t-body`/`.lead` (ink/muted) — an accent
+  color is never body text;
+- `TEXT-CLIP` / `TEXT-OVERLAP`: replace fixed heights / absolute positioning
+  with a pattern;
+- `MISSING-BR`: add `<br>` between the rows inside the box;
+- `MOSTLY-EMPTY`: add a block or switch the pattern.
+
+If the same fix touches several slides (identical anchors), rewrite the whole
+file — do not try N identical edits.
+
 Taste suggestions you intentionally leave (a deliberate wide spacing, an
 unaccented quote slide) do not need fixing — but say in your reply which
 suggestions you left and why. Do not build the .pptx while errors remain: the
@@ -383,6 +399,8 @@ verify estimated numbers, and on "fix slide N" — edit `deck.html`, rebuild.
   is a failed copy;
 - do not "fix" overflow by shrinking the font;
 - do not delete `deck.html` after export;
+- never tell the user to edit the deck by hand ("please fix the paths in the
+  file") — fixing files is YOUR job; recover yourself (read → rewrite);
 - do not ask the user about editor/tool mechanics (ambiguous anchors, failed
   edits, formatting) — read the file and recover yourself: unique anchor or
   full rewrite.

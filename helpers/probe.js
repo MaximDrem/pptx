@@ -531,7 +531,12 @@
     // Broken images.
     for (const img of Array.from(slide.querySelectorAll("img"))) {
       if (img.complete && img.naturalWidth === 0) {
-        push("broken-image", "an image failed to render — fix the path and re-run assets.cjs");
+        const src = (img.getAttribute("src") || "(no src)").slice(0, 60);
+        push(
+          "broken-image",
+          `image failed to render: ${src} — the file is missing or misnamed; keep it next to the deck (images/…). ` +
+            `"./images/x" and "images/x" are equivalent — do NOT rewrite paths; fix all slides with this file at once`,
+        );
         break;
       }
     }

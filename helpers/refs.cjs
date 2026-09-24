@@ -55,4 +55,25 @@ const MIME = {
 
 const mimeOf = (file) => MIME[path.extname(file).toLowerCase()] || "application/octet-stream";
 
-module.exports = { SKILL_DIR, FONTS_DIR, isData, isExternal, resolveRef, mimeOf };
+// Local/remote references of a deck: url(...), <img src>, <script src>, <link href>.
+function collectRefs(html) {
+  const refs = [];
+  const push = (ref, kind) => {
+    if (!ref) return;
+    const r = ref.trim();
+    if (!r || isData(r)) return;
+    refs.push({ ref: r, kind });
+  };
+  let m;
+  const urlRe = /url\((["']?)([^)"']+)\1\)/g;
+  while ((m = urlRe.exec(html))) push(m[2], "url");
+  const imgRe = /<img\b[^>]*?\bsrc=(["'])([^"']+)\1/gi;
+  while ((m = imgRe.exec(html))) push(m[2], "img");
+  const scriptRe = /<script\b[^>]*?\bsrc=(["'])([^"']+)\1/gi;
+  while ((m = scriptRe.exec(html))) push(m[2], "script");
+  const linkRe = /<link\b[^>]*?\bhref=(["'])([^"']+)\1/gi;
+  while ((m = linkRe.exec(html))) push(m[2], "link");
+  return refs;
+}
+
+module.exports = { SKILL_DIR, FONTS_DIR, isData, isExternal, resolveRef, mimeOf, collectRefs };
