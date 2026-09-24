@@ -76,19 +76,33 @@ function rendererEnv() {
 // → { ran, code, reason?, outDir, kept, post, report, inventory, artifacts }
 function renderDeck(deckPath, opts = {}) {
   const deck = path.resolve(deckPath);
-  // Managed style block: refresh it from the current skill files before
-  // rendering (idempotent, a no-op when the deck already carries the CSS).
+  if (!fs.existsSync(deck)) {
+    return Promise.resolve({ ran: false, code: 2, reason: "deck not found: " + deck });
+  }
+  // Build copy: the AUTHORED deck.html is never mutated (data URIs would make
+  // it uneditable). expand-styles + asset inlining run on a temp copy only.
+  let buildDir = null;
+  let buildDeck = null;
   try {
-    require("./expand-styles.cjs").expandDeck(deck);
+    buildDir = fs.mkdtempSync(path.join(os.tmpdir(), "deck-build-"));
+    buildDeck = path.join(buildDir, path.basename(deck));
+    fs.copyFileSync(deck, buildDeck);
+    require("./expand-styles.cjs").expandDeck(buildDeck);
+    require("./assets.cjs").inlineAssets(buildDeck, { inline: true, quiet: true });
   } catch (e) {
-    return Promise.resolve({ ran: false, code: 2, reason: `styles expansion failed: ${e && e.message}` });
+    if (buildDir) {
+      try {
+        fs.rmSync(buildDir, { recursive: true, force: true });
+      } catch {}
+    }
+    return Promise.resolve({ ran: false, code: 2, reason: `build copy failed: ${e && e.message}` });
   }
   const binary = process.env.GIGATOOL_NODE || process.env.MULTITOOL_NODE;
   if (!binary) {
+    try {
+      fs.rmSync(buildDir, { recursive: true, force: true });
+    } catch {}
     return Promise.resolve({ ran: false, code: null, reason: "GIGATOOL_NODE is not set — run inside the workspace app" });
-  }
-  if (!fs.existsSync(deck)) {
-    return Promise.resolve({ ran: false, code: 2, reason: "deck not found: " + deck });
   }
   const env = rendererEnv();
   const keep = !!opts.outDir || !!opts.pptx || !!opts.pdf;
@@ -99,7 +113,7 @@ function renderDeck(deckPath, opts = {}) {
   if (env.GIGATOOL_APP_PATH) args.push(env.GIGATOOL_APP_PATH);
   args.push(
     "--deck-render",
-    deck,
+    buildDeck,
     "--out-dir",
     outDir,
     "--probe",
@@ -118,6 +132,9 @@ function renderDeck(deckPath, opts = {}) {
     let timedOut = false;
     let timer = null;
     const cleanup = () => {
+      try {
+        fs.rmSync(buildDir, { recursive: true, force: true });
+      } catch {}
       if (keep) return;
       try {
         fs.rmSync(outDir, { recursive: true, force: true });

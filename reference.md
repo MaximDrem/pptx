@@ -284,6 +284,9 @@ Blocking `error` types: `text-clip`, `out-of-bounds` (content, not decor),
 ... render.cjs deck.html [--out-dir <dir>] [--pptx] [--pdf] [--no-png]
 ```
 
+`renderDeck` first builds a temp copy of the deck (expand-styles + asset
+inlining) and renders that copy — the authored `deck.html` is never mutated.
+
 Use when you only need the report or only the export. Without `--out-dir` (and
 without `--pptx/--pdf`) the temp folder is removed after the run, but
 `report.json` and `inventory.json` are parsed before removal and returned to
@@ -339,9 +342,14 @@ markup, rerun the render.
 
 ```bash
 ... lint-deck.cjs deck.html            # static check (exit 1 = errors)
-... assets.cjs deck.html               # inline fonts/images
-... assets.cjs deck.html --check       # check only (exit 1 = not inlined)
+... assets.cjs deck.html               # check: local refs resolve (default)
+... assets.cjs deck.html --inline      # bake data URIs into deck.html (standalone HTML only)
 ```
+
+Default is check-only. The authored deck keeps relative `images/…` and the
+managed style block; the render/export pipeline expands styles and inlines
+assets into a temp build copy, so the source the model edits never grows data
+URIs. Use `--inline` only when a single-file HTML is explicitly needed.
 
 `lint-deck` catches: `http(s)://`, protocol-relative `//host/...` and `file:`
 (the deck is offline), `gigachat_image(` and other chat-tool calls (they must

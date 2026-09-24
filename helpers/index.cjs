@@ -4,12 +4,13 @@
 //   ELECTRON_RUN_AS_NODE=1 "$GIGATOOL_NODE" "$HOME/.wsc/config/skills/presentation/helpers/index.cjs" \
 //     deck.html [--pptx] [--pdf] [--no-png] [--out-dir <dir>]
 //
-//   1. expand-styles.cjs  install the canonical CSS into the managed
-//                         <style data-presentation-style="…"> block
-//   2. assets.cjs         inline vendored fonts/images so the deck is standalone
-//   3. lint-deck.cjs      static preflight (offline contract, files, markup)
-//   4. render.cjs         real Chromium render: captures + report.json + inventory.json
-//   5. --pptx/--pdf       native .pptx (dom-to-pptx) and one-slide-per-page PDF
+//   1. lint-deck.cjs      static preflight on the authored deck (offline
+//                         contract, files, markup, template fidelity)
+//   2. render.cjs         builds a TEMP copy (expand-styles + asset inlining),
+//                         renders it in Chromium: captures + reports
+//   3. --pptx/--pdf       native .pptx (dom-to-pptx) and one-slide-per-page PDF
+//   --inline (optional)   bakes styles+assets into deck.html for a standalone
+//                         single-file HTML
 //
 // Exit codes: 0 clean · 1 lint/assets/styles errors · 2 render failed to start ·
 // 3 render/export crashed · 4 blocking layout issues — export skipped.
@@ -30,26 +31,26 @@ async function main() {
   const outIdx = argv.indexOf("--out-dir");
   const deck = argv.find((a, i) => !a.startsWith("--") && (outIdx === -1 || i !== outIdx + 1));
   if (!deck) {
-    console.error("usage: index.cjs <deck.html> [--pptx] [--pdf] [--no-png] [--out-dir <dir>]");
+    console.error("usage: index.cjs <deck.html> [--pptx] [--pdf] [--no-png] [--out-dir <dir>] [--inline]");
     process.exit(2);
   }
   const absDeck = path.resolve(deck);
 
-  // The managed style block is expanded first: the model never copies the
-  // canonical CSS by hand, so the stage/one-box contract cannot drift.
-  try {
-    const s = expandDeck(absDeck);
-    if (s.expanded) console.log(`styles: expanded "${s.style}" (managed block)`);
-  } catch (e) {
-    console.error("index: styles expansion failed: " + (e && e.message));
-    process.exit(1);
-  }
-
-  try {
-    execFileSync(process.execPath, [path.join(__dirname, "assets.cjs"), absDeck], { stdio: "inherit", timeout: 120000 });
-  } catch (e) {
-    console.error("index: assets.cjs failed — fix missing files or paths and re-run");
-    process.exit(1);
+  // The authored deck stays untouched: expand-styles and asset inlining run on
+  // a TEMP build copy inside renderDeck, so edits never fight data URIs.
+  // --inline bakes them into deck.html itself (standalone single-file HTML);
+  // keep a relative-ref copy if you plan further edits.
+  if (argv.includes("--inline")) {
+    try {
+      const s = expandDeck(absDeck);
+      if (s.expanded) console.log(`styles: expanded "${s.style}" into deck.html (--inline)`);
+      const { inlineAssets } = require("./assets.cjs");
+      const a = inlineAssets(absDeck, { inline: true, quiet: true });
+      console.log(`assets: inlined ${a.inlinedFonts} font(s), ${a.inlinedImages} image(s) into deck.html (--inline)`);
+    } catch (e) {
+      console.error("index: --inline failed: " + (e && e.message));
+      process.exit(1);
+    }
   }
 
   if (!argv.includes("--no-lint")) {

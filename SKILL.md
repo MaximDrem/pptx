@@ -222,6 +222,18 @@ about tool mechanics, recover yourself**:
 Never leave a half-built deck behind: "continue later" means the next call
 rewrites the complete file.
 
+**Editing later** (a second pass, or "fix slide N"):
+
+- read `deck.html` first: it stays small — images are relative `images/…`
+  paths and styles live in the managed block, so a fresh Read gives exact
+  anchors (never retype big fragments from memory);
+- anchor on unique text: the previous slide's footer
+  (`<div class="footer"><span>Section</span><span>NN</span></div>`) or a whole
+  element (opening + closing tag) — never on a bare `</section>`;
+- if an edit still fails, re-read the exact lines, retry with a larger unique
+  context, or rewrite the complete file (it is small). Never ask the user
+  about edit mechanics.
+
 ```html
 <!doctype html>
 <html lang="ru">
@@ -282,10 +294,13 @@ Markup rules:
 - **icons**: copy ready `<svg class="icon">…</svg>` lines from
   `styles/_base/icons.md` (one line per name). There is no `node` binary and
   no emoji — never draw your own paths;
-- images — local files (`<img src="images/...">` with `alt`), generated ONLY
-  with a chat tool (e.g. `gigachat_image`) before assembling; template media —
-  copied next to the deck and verified by looking at them. **One image = one
-  meaning**: never place the same file on two slides (probe flags
+- images — local files referenced relatively (`<img src="images/...">` with
+  `alt`), generated ONLY with a chat tool (e.g. `gigachat_image`) before
+  assembling; template media — copied next to the deck and verified by looking
+  at them. **Never paste `data:` URIs into the deck**: the builder inlines
+  styles and assets into a temp build copy, so the authored file stays small
+  and editable (`index.cjs --inline` bakes them in only when a standalone
+  single-file HTML is explicitly asked for). **One image = one meaning**: never place the same file on two slides (probe flags
   `image-reuse`), and a photo must fill a real block — a full-size picture
   squeezed into a small tile reads as an accident (probe flags `tiny-image`);
 - no external links/fonts/scripts (except our navigator);
@@ -350,6 +365,11 @@ verify estimated numbers, and on "fix slide N" — edit `deck.html`, rebuild.
 
 ## Hard bans
 
+- **no permission questions**: never "Would you like me to proceed / make these
+  changes?" — the user asked for the deck, so you do the whole job to the end
+  in one turn (upfront content questions are fine; mid-work approval is not).
+  Never re-send the same issue list without a change: fix it and re-render, or
+  rewrite the file;
 - no `.ts/.js/.py` decks or build scripts in the result, no npm/pip/curl;
 - no chat tools from HTML or helpers;
 - no emoji, external URLs, CDNs;

@@ -114,6 +114,22 @@ async function main() {
   assert.deepStrictEqual(r5.artifacts, [], "no artifacts copied when the helper blocks");
   assert.ok(!fs.existsSync(path.join(dir, "soft-block.deck.pptx")), "no .pptx next to the deck");
 
+  // 6. The authored source stays clean: assets are inlined only in the build copy.
+  const px = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+    "base64",
+  );
+  fs.writeFileSync(path.join(dir, "px.png"), px);
+  const srcDeck = path.join(dir, "clean.deck.html");
+  fs.writeFileSync(
+    srcDeck,
+    '<!doctype html><html><body><div class="deck-stage" id="deck-stage"><section class="slide" data-role="content"><img src="px.png" alt="">text</section></div></body></html>',
+  );
+  const r6 = await renderDeck(srcDeck, {});
+  assert.strictEqual(r6.ran, true);
+  assert.ok(!fs.readFileSync(srcDeck, "utf8").includes("data:image"), "authored deck.html must stay free of data URIs");
+  assert.ok(fs.readFileSync(srcDeck, "utf8").includes('src="px.png"'), "relative refs stay in the source");
+
   console.log("PASS  render: отчёт переживает очистку temp, артефакты кладутся рядом с deck.html");
 }
 

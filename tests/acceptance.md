@@ -9,7 +9,7 @@ machine).
 ```bash
 node --check helpers/lib/xml.cjs helpers/lib/pptx.cjs helpers/read-pptx.cjs
 node helpers/lint-deck.cjs examples/example-deck.html      # → clean
-node helpers/assets.cjs  examples/example-deck.html --check # → clean
+node helpers/assets.cjs  examples/example-deck.html         # → clean (check)
 node tests/unit/pptx-post.test.cjs          # per-paragraph line spacing
 node tests/unit/validate-checks.test.cjs    # new artifact checks
 node tests/unit/render-report.test.cjs      # report/artifacts after temp cleanup, exit 4

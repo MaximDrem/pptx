@@ -1,13 +1,17 @@
 #!/usr/bin/env node
-// presentation v2 — inline local fonts/images into deck.html as data URIs.
+// presentation v2 — check (default) or inline (--inline) local fonts/images.
 //
-//   ELECTRON_RUN_AS_NODE=1 "$GIGATOOL_NODE" .../assets.cjs deck.html [--check]
+//   ELECTRON_RUN_AS_NODE=1 "$GIGATOOL_NODE" .../assets.cjs deck.html [--inline]
 //
-// The working folder must contain ONLY the deliverables (deck.html +
-// <slug>.pptx). Fonts are referenced as url("fonts/<file>.woff2") — this
-// script resolves them against the skill's fonts/ directory and bakes them
-// in, so the deck is self-contained for rendering and for the export engine.
-// `--check` reports only (exit 1 when something is not inlined yet).
+// Default is CHECK ONLY: it verifies that every local reference resolves
+// (fonts/ → the skill's fonts dir, images/ → next to the deck) and reports
+// what is not inlined yet. The authored deck.html stays small and editable —
+// the render/export pipeline inlines assets into a TEMP build copy, so data
+// URIs never enter the source that the model edits.
+//
+// --inline bakes the data URIs into deck.html itself; use it only when a
+// standalone single-file HTML is explicitly needed (editing it afterwards is
+// no longer practical — keep the relative-ref version as the source).
 "use strict";
 
 const fs = require("fs");
@@ -15,7 +19,8 @@ const path = require("path");
 const { isData, isExternal, resolveRef, mimeOf } = require("./refs.cjs");
 
 function inlineAssets(deckPath, opts = {}) {
-  const check = !!opts.check;
+  const inline = !!opts.inline;
+  const check = !inline;
   const file = path.resolve(deckPath);
   const deckDir = path.dirname(file);
   const html = fs.readFileSync(file, "utf8");
@@ -78,30 +83,28 @@ function inlineAssets(deckPath, opts = {}) {
 
 function main() {
   const args = process.argv.slice(2);
-  const check = args.includes("--check");
+  const inline = args.includes("--inline");
   const file = args.filter((a) => !a.startsWith("--"))[0];
   if (!file) {
-    console.error("usage: assets.cjs <deck.html> [--check]");
+    console.error("usage: assets.cjs <deck.html> [--inline]");
     process.exit(2);
   }
-  const r = inlineAssets(file, { check });
+  const r = inlineAssets(file, { inline, quiet: true });
   for (const m of r.missing) console.error("missing local file: " + m);
   if (r.external) console.error("external reference(s) present (" + r.external + ") — lint-deck blocks them; host locally");
-  if (check) {
-    if (r.pending || r.missing.length) {
-      if (r.pending) console.error("assets: " + r.pending + " reference(s) not inlined — run assets.cjs without --check");
-      if (r.missing.length) console.error("assets: " + r.missing.length + " missing local file(s) — fix the paths first");
-      process.exit(1);
-    }
-    console.log("assets: clean (all local refs inlined)");
+  if (r.missing.length) process.exit(1);
+  if (inline) {
+    console.log(
+      "assets: inlined " + r.inlinedFonts + " font(s), " + r.inlinedImages + " image(s)" +
+        (r.already ? ", already inline " + r.already : ""),
+    );
     return;
   }
-  console.log(
-    "assets: inlined " + r.inlinedFonts + " font(s), " + r.inlinedImages + " image(s)" +
-      (r.already ? ", already inline " + r.already : "") +
-      (r.missing.length ? ", MISSING " + r.missing.length : ""),
-  );
-  if (r.missing.length) process.exit(1);
+  if (r.pending) {
+    console.log("assets: ok — " + r.pending + " local reference(s) stay relative (the builder inlines them into the temp build copy)");
+  } else {
+    console.log("assets: clean (all local refs resolve)");
+  }
 }
 
 if (require.main === module) main();

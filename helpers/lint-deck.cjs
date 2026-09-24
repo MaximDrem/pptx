@@ -4,7 +4,7 @@
 //
 // Errors block (offline contract, tool calls that only exist in the chat
 // turn, missing local files, invalid slide markup). Warnings inform (fonts or
-// images not inlined yet, missing data-role, classes used but not defined in
+// missing local files, missing data-role, classes used but not defined in
 // the deck's own <style> — the classic source of silently broken layouts).
 // Exit 0 clean / 1 errors / 2 usage.
 "use strict";
@@ -161,10 +161,9 @@ function lintDeck(deckPath, opts = {}) {
       errors.push("missing local file: " + ref + " (looked at: " + tried.join(", ") + ")");
       continue;
     }
-    const isFont = /\.(woff2?|ttf|otf)$/i.test(ref);
-    if ((isFont || kind === "img") && kind !== "script") {
-      warnings.push((isFont ? "font" : "image") + " not inlined: " + ref + " — run `assets.cjs deck.html`");
-    }
+    // Local refs staying relative is the normal authored state — the builder
+    // inlines them into the temp build copy (run assets.cjs --inline only for
+    // a standalone single-file HTML).
   }
 
   // 4. Structure.
@@ -200,11 +199,10 @@ function lintDeck(deckPath, opts = {}) {
   const ignored = new Set(["lucide"]);
   const unknown = Array.from(used).filter((c) => !defined.has(c) && !ignored.has(c));
   const managedEmpty = /<style\b[^>]*\bdata-presentation-style=(["'])[^"']*\1[^>]*>\s*<\/style>/i.test(raw);
-  if (managedEmpty) {
-    warnings.push(
-      "the managed style block is empty — run index.cjs / expand-styles.cjs; it installs stage.css, tokens and _base.css automatically",
-    );
-  } else if (unknown.length && styleBlocks.length) {
+  // An empty managed block is the NORMAL state of the authored deck: the
+  // builder expands it into a temp copy, so the class check understands that
+  // the base classes are defined (nothing to warn about).
+  if (!managedEmpty && unknown.length && styleBlocks.length) {
     warnings.push(
       "class(es) used but not defined in the deck's <style> (silent fallback — typo or missing paste): " +
         unknown.slice(0, 12).join(", ") +

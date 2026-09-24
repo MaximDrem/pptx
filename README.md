@@ -49,6 +49,11 @@ deck.html ──┬─ expand-styles.cjs  canonical CSS into the managed style b
             └─ read-pptx.cjs / style-profile.cjs   (input: someone else's .pptx)
 ```
 
+- **Source and build are separate.** `deck.html` is a small editable source
+  (relative `images/…`, managed style block). The builder expands styles and
+  inlines assets into a temp build copy for render/export, so the source the
+  model edits never contains data URIs. `index.cjs --inline` bakes a
+  standalone single-file HTML on request.
 - **The model never copies the CSS.** The deck carries one managed block
   (`<style data-presentation-style="signal-night">`…) and the builder installs
   `stage.css` + `fonts.css` + tokens + `_base.css` on every run; deck-authored
