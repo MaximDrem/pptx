@@ -67,21 +67,16 @@ function cleanArtifacts(dir) {
   return removed;
 }
 
-// Only contract violations block the export. Probe issues carry a severity;
+// Only fatal render defects block the export. Probe issues carry a severity;
 // the fallback set keeps older probes safe. Shared with review.cjs.
 const BLOCKING_TYPES = new Set([
   "text-clip",
-  "out-of-bounds",
-  "text-overlap",
-  "low-contrast",
   "blank",
   "maybe-blank",
-  "mostly-empty",
   "broken-image",
   "stage-broken",
   "probe-error",
   "hidden-slide",
-  "missing-br",
 ]);
 
 function deliverArtifacts(outDir, deck, opts) {
@@ -382,7 +377,7 @@ function renderDeck(deckPath, opts = {}) {
           console.error("artifact copy failed: " + (e.message || e));
         }
       }
-      finish({ ran: true, code: effectiveCode, outDir, kept: keep, post, report, inventory, artifacts, reason: effectiveCode === 4 ? "blocking layout issues" : undefined });
+      finish({ ran: true, code: effectiveCode, outDir, kept: keep, post, report, inventory, artifacts, reason: effectiveCode === 4 ? "fatal render defects" : undefined });
       });
     };
     runOnce(1);

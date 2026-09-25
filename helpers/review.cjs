@@ -77,7 +77,13 @@ async function main() {
     if (missing.length) {
       console.error("=== MISSING FILES (fix these paths first) ===");
       for (const m of missing) console.error("  " + m);
-      console.error("the file must exist next to the deck (images/…); check the spelling — do not rename paths to ./images, both forms are equivalent");
+      const deckDir = path.dirname(path.resolve(deck));
+      const cwd = process.cwd();
+      if (deckDir !== cwd) {
+        console.error(`the deck lives in ${deckDir}, but you are working in ${cwd} — save/move the deck into the working folder (the user sees files there) and keep images/ next to it`);
+      } else {
+        console.error("the file must exist next to the deck (images/…); check the spelling — do not rename paths to ./images, both forms are equivalent");
+      }
       process.exit(1);
     }
   } catch {
@@ -128,19 +134,21 @@ async function main() {
     );
   }
 
-  // Static lint runs on the authored file and is the export gate. Printing it
-  // here catches markup mistakes the render cannot name precisely (raw <h3>/<p>
-  // inside a box, missing footer) next to the probe findings.
-  console.log("\n=== STATIC LINT (export gate) ===");
+  // Static lint, printed once from the same run (it used to spawn a child and
+  // echo every line twice). It is advisory: errors here are contract breaks
+  // (offline, missing files, box markup that corrupts the export) — the rest
+  // is judgement the agent applies to its own deck.
+  console.log("\n=== STATIC LINT ===");
   try {
-    const out = execFileSync(process.execPath, [path.join(__dirname, "lint-deck.cjs"), deck], { encoding: "utf8" });
-    console.log("  " + out.trim().split("\n").slice(-1)[0]);
+    const { lintDeck } = require("./lint-deck.cjs");
+    const r = lintDeck(deck, { quiet: true });
+    for (const e of r.errors.slice(0, 6)) console.log("  error: " + e);
+    if (r.errors.length > 6) console.log(`  … +${r.errors.length - 6} more error(s)`);
+    for (const w of r.warnings.slice(0, 6)) console.log("  warning: " + w);
+    if (r.warnings.length > 6) console.log(`  … +${r.warnings.length - 6} more warning(s)`);
+    if (!r.errors.length && !r.warnings.length) console.log("  clean");
   } catch (e) {
-    const text = `${e.stdout || ""}\n${e.stderr || ""}`.trim();
-    const errs = text.split("\n").filter((l) => l.startsWith("error:"));
-    for (const l of errs.slice(0, 6)) console.log("  " + l);
-    if (errs.length > 6) console.log(`  … +${errs.length - 6} more lint error(s)`);
-    if (!errs.length) console.log("  lint failed: " + (e.message || e));
+    console.log("  lint failed: " + (e.message || e));
   }
 
   // Structural read: same facts the eye gets from the PNGs — background layer,

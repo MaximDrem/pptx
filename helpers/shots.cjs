@@ -140,7 +140,19 @@ async function main() {
     // no dir yet — the renderer will create it
   }
 
-  const child = spawn(binary, args, { env, stdio: ["ignore", "inherit", "inherit"] });
+  // The template is the REFERENCE, not a suspect deck: the probe's layout
+  // findings on a converted template (off-slide bleed, text over graphics,
+  // its own contrast choices) are the original's design, not defects to fix.
+  // Baseline them out — like validate.py --original baselines a template's
+  // XSD errors — and keep only the render facts (PNGs, counts, paths).
+  const child = spawn(binary, args, { env, stdio: ["ignore", "pipe", "pipe"] });
+  let outBuf = "";
+  child.stdout.on("data", (d) => {
+    outBuf += d;
+  });
+  child.stderr.on("data", (d) => {
+    outBuf += d;
+  });
   const timeoutMs = Number(process.env.PRESENTATION_RENDER_TIMEOUT_MS || 300000);
   const timer = setTimeout(() => {
     try {
@@ -154,6 +166,13 @@ async function main() {
   });
   child.on("exit", (code) => {
     clearTimeout(timer);
+    const { text, suppressed } = filterTemplateNoise(outBuf);
+    if (text) console.log(text);
+    if (suppressed > 0) {
+      console.log(
+        `shots: ${suppressed} layout finding(s) on the template not shown — the template is the reference, its design is not a defect; you are here to copy it, not to fix it`,
+      );
+    }
     const pngs = fs.existsSync(outDir) ? fs.readdirSync(outDir).filter((f) => /^slide-\d+\.png$/i.test(f)).sort() : [];
     if (!pngs.length) {
       console.error(`shots: the renderer produced no PNGs (exit ${code}).`);
@@ -171,7 +190,35 @@ async function main() {
   });
 }
 
-main().catch((e) => {
-  console.error(e.stack || String(e));
-  process.exit(3);
-});
+// Drop per-slide probe findings and export-gate talk from a template verify
+// run; keep render facts. Exported for tests.
+function filterTemplateNoise(buffer) {
+  const lines = buffer.split("\n");
+  const kept = [];
+  let suppressed = 0;
+  for (const line of lines) {
+    const t = line.trim();
+    if (/^slide \d+: (error|suggestion|warning): /i.test(t)) {
+      suppressed++;
+      continue;
+    }
+    if (/^render: \d+ blocking error/i.test(t) || /^render: clean/i.test(t) || /^deck: FONT NOT LOADED/i.test(t)) {
+      continue;
+    }
+    kept.push(line);
+  }
+  const text = kept
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  return { text, suppressed };
+}
+
+if (require.main === module) {
+  main().catch((e) => {
+    console.error(e.stack || String(e));
+    process.exit(3);
+  });
+}
+
+module.exports = { filterTemplateNoise };

@@ -302,16 +302,17 @@ automatically, so normally you never run it by hand.
    them elsewhere.
 
 Exit: 0 — clean; 1 — lint/assets/styles errors; 2 — render did not start;
-3 — render crashed; **4 — blocking layout issues: the export was skipped and
-no .pptx was produced**. Non-blocking issues are lines to fix, not failures.
+3 — render crashed; **4 — fatal render defects: the export was skipped and
+no .pptx was produced**. Everything else is a finding, not a failure.
 
-Blocking `error` types: `text-clip`, `out-of-bounds` (content, not decor),
-`text-overlap`, `low-contrast`, `blank`/`maybe-blank`, `mostly-empty`,
-`broken-image`, `stage-broken`, `probe-error`, `hidden-slide`, `missing-br`.
-Everything else (`empty-region`, `tight-gap`, `no-accent`, `sparse-box`,
-`accent-*`, `plain-cover`, `img-no-alt`, `decor-stamp`, `decor-under-text`,
-`stretched-image`) is a `suggestion` — it never blocks
-the export.
+Fatal `error` types (the only ones that stop the export): `text-clip`,
+`blank`/`maybe-blank`, `broken-image`, `stage-broken`, `probe-error`,
+`hidden-slide`. Everything else — `out-of-bounds` (bleed is often the design),
+`text-overlap`, `low-contrast`, `mostly-empty`, `missing-br`, `empty-region`,
+`tight-gap`, `no-accent`, `sparse-box`, `accent-*`, `plain-cover`,
+`img-no-alt`, `decor-stamp`, `decor-under-text`, `stretched-image` — is a
+`suggestion` for the agent's eyes: keep what is the design, fix what is a
+defect.
 
 ## render.cjs — a standalone render run
 
@@ -485,19 +486,19 @@ exits 2.
 One command for the whole loop: renders the deck, prints the paths of every
 `slide-NN.png` to LOOK at (the out-dir is cleaned first, so the list is always
 the current render — a reused dir used to show stale pictures from an older
-deck), lists probe issues, prints the STATIC LINT block (authored-file lint =
-the export gate) and the structural read of every slide
+deck), lists probe issues, prints the STATIC LINT block (authored-file lint:
+contract errors plus advice) and the structural read of every slide
 (background layer, decor, blocks, fills, issues — the same text
 `inspect.cjs` prints), runs `validate.cjs` on the existing `.pptx` (skipped with
 `--no-validate`), optionally renders reference shots of a template, and prints
 the review checklist (style consistency, layout variety, visual anchors, decor,
-template similarity, AI-slop signals). When blocking errors exist it prints an
+template similarity, AI-slop signals). When fatal errors exist it prints an
 ACTION line: fix via `slide.cjs --get/--set` (or one full rewrite), then re-run.
 
 The loop is: `review` → READ the PNGs (vision) → fix `deck.html` → `review`
-again, until `render: clean` AND the eyes agree; then `index.cjs --pptx` and
-`validate.cjs`. The export is blocked (exit 4) while blocking issues remain,
-so an unreviewed dirty deck cannot slip through.
+again, until `render: clean` AND the eyes agree — two or three honest passes,
+then stop; `index.cjs --pptx` and `validate.cjs`. The export is blocked
+(exit 4) only by fatal defects, so a blank or broken deck cannot slip through.
 
 ## Diagnostics
 
@@ -506,7 +507,7 @@ so an unreviewed dirty deck cannot slip through.
 | `GIGATOOL_NODE is not set` | running outside the app | tell the user; do not fake a render |
 | `render: the renderer could not start or rejected its arguments (exit 2)` | the app is not built / wrong path / missing vendor or probe | check `$GIGATOOL_NODE`, vendor/ and probe.js |
 | `render: timed out` | the deck hangs (endless JS) | remove scripts from the deck except the navigator |
-| `render: N blocking error(s), M suggestion(s) — export skipped` (exit 4) | blocking layout defects: the .pptx was not produced | fix the listed issues, re-run; export only after a clean render |
+| `render: N blocking error(s), M suggestion(s) — export skipped` (exit 4) | fatal render defects: the .pptx was not produced | fix the listed issues, re-run; export only after a clean render |
 | `the deck is inside a temp directory` (lint) | the deck was built in `/tmp` — the user will not see it | build `deck.html` in the working folder |
 | `deck: FONT NOT LOADED` | the family is not vendored/declared | replace with a vendored face; `validate` raises `FONT NOT LOADED` |
 | `error FONT NOT LOADED` (validate) | font not vendored/declared | swap the token or add the face to `fonts/` |
@@ -516,7 +517,7 @@ so an unreviewed dirty deck cannot slip through.
 | `error MISSING-BR` | rows in a box are not separated by `<br>` | add `<br>` between rows |
 | `warn NO-ACCENT` | a content slide has nothing accented | highlight the key block (patterns.md, "Accent budget") |
 | `warn SPARSE-BOX` | a tall box is nearly empty | shorten the box or add substance |
-| `render: N issue(s) — K BLOCKING` (review.cjs) | see the type table; blocking errors exit 4 | fix one by one, rerender |
+| `render: N issue(s) — K BLOCKING` (review.cjs) | see the type table; fatal errors exit 4 | fix one by one, rerender |
 | `Found multiple matches for oldString` / `Could not find oldString` (edit tool) | the slide opening, logo and decor markup repeat on every slide — the edit tool's `oldString` is ambiguous by design | switch to `slide.cjs`: `--get N` → edit the fragment → `--set N --from file` (or `--append`); a full rewrite in one write call also works. Never retry with more context and never re-run the pipeline on a failed edit |
 
 ## Skill files

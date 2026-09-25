@@ -47,7 +47,8 @@ const bypass = lintDeck(file, { quiet: true });
 delete process.env.GIGATOOL_DECK_LINT;
 assert.ok(bypass.errors.length > 0, "GIGATOOL_DECK_LINT=0 must not disable lint anymore");
 
-// Template fidelity: a profile with assets but a deck that uses none → error.
+// Template fidelity: advisory — the findings fire as WARNINGS (the agent and
+// the user judge the copy; nothing here blocks the build).
 {
   const stylesDir = fs.mkdtempSync(path.join(os.tmpdir(), "presentation-v3-styles-"));
   const profileDir = path.join(stylesDir, "brand");
@@ -76,9 +77,10 @@ assert.ok(bypass.errors.length > 0, "GIGATOOL_DECK_LINT=0 must not disable lint 
   process.env.PRESENTATION_STYLES_DIR = stylesDir;
   const noAssetsUsed = lintDeck(deck, { quiet: true });
   assert.ok(
-    noAssetsUsed.errors.join("\n").includes("has assets but the deck uses none"),
-    "profile with assets + text-only deck must be an error",
+    noAssetsUsed.warnings.join("\n").includes("has assets but the deck uses none"),
+    "profile with assets + text-only deck must warn",
   );
+  assert.ok(!noAssetsUsed.errors.join("\n").includes("template profile"), "template fidelity must not block (advisory by design)");
 
   // Background only: the "any image" rule is satisfied, but the decor rule is not.
   const bgOnly = fs
@@ -87,11 +89,11 @@ assert.ok(bypass.errors.length > 0, "GIGATOOL_DECK_LINT=0 must not disable lint 
   fs.writeFileSync(deck, bgOnly);
   const bgOnlyRes = lintDeck(deck, { quiet: true });
   assert.ok(
-    bgOnlyRes.errors.join("\n").includes("has decor assets but the deck uses none"),
-    "background-only copy must fail the decor rule",
+    bgOnlyRes.warnings.join("\n").includes("has decor assets but the deck uses none"),
+    "background-only copy must warn about the decor",
   );
 
-  // Decor only: the background is still flat — that is also a failed copy.
+  // Decor only: the background is still flat — that is also a weak copy.
   const decorOnly = bgOnly.replace('<img class="bg-img" src="images/template-bg.png" alt="">', "").replace(
     "</section>",
     '<img class="decor-img" style="left:900px; top:-120px; width:380px" src="images/template-decor-1.png" alt=""></section>',
@@ -99,8 +101,8 @@ assert.ok(bypass.errors.length > 0, "GIGATOOL_DECK_LINT=0 must not disable lint 
   fs.writeFileSync(deck, decorOnly);
   const decorOnlyRes = lintDeck(deck, { quiet: true });
   assert.ok(
-    decorOnlyRes.errors.join("\n").includes("uses an image background but the deck has none"),
-    "decor-only copy must fail the background rule",
+    decorOnlyRes.warnings.join("\n").includes("uses an image background but the deck has none"),
+    "decor-only copy must warn about the background",
   );
 
   // Backgrounds on cover/closing only: a copy must keep them on most slides.
@@ -116,17 +118,17 @@ assert.ok(bypass.errors.length > 0, "GIGATOOL_DECK_LINT=0 must not disable lint 
     fs.writeFileSync(deck, sparse);
     const sparseRes = lintDeck(deck, { quiet: true });
     assert.ok(
-      sparseRes.errors.join("\n").includes("flat slides read as a different deck"),
-      "backgrounds missing on most slides must be an error",
+      sparseRes.warnings.join("\n").includes("but the deck has one on only"),
+      "backgrounds missing on most slides must warn",
     );
   }
 
-  // Adding one decor clears both errors.
+  // Adding one decor clears both warnings.
   const withDecor = bgOnly.replace("</section>", '<img class="decor-img" style="left:900px; top:-120px; width:380px" src="images/template-decor-1.png" alt=""></section>');
   fs.writeFileSync(deck, withDecor);
   const fixed = lintDeck(deck, { quiet: true });
   delete process.env.PRESENTATION_STYLES_DIR;
-  assert.ok(!fixed.errors.join("\n").includes("template profile"), "using bg + decor must clear the template errors");
+  assert.ok(!fixed.warnings.join("\n").includes("template profile"), "using bg + decor must clear the template warnings");
 }
 
 // Malformed deck: an unclosed <section> must be a clear error, not a render crash.
@@ -156,9 +158,10 @@ assert.ok(bypass.errors.length > 0, "GIGATOOL_DECK_LINT=0 must not disable lint 
   );
   const res = lintDeck(rawDeck, { quiet: true });
   const errs = res.errors.join("\n");
-  assert.ok(errs.includes("no .headline"), "raw <h2> must be reported");
-  assert.ok(errs.includes('no <div class="content">'), "missing content wrapper must be reported");
-  assert.ok(errs.includes("no block from patterns.md"), "raw paragraphs must be reported");
+  const warns = res.warnings.join("\n");
+  assert.ok(warns.includes("no .headline"), "raw <h2> must be reported (as advice)");
+  assert.ok(warns.includes('no <div class="content">'), "missing content wrapper must be reported (as advice)");
+  assert.ok(warns.includes("no block from patterns.md"), "raw paragraphs must be reported (as advice)");
   assert.ok(errs.includes("external URL on slide 1: http://example.com"), "the URL error must name the slide");
   assert.ok(!errs.includes("support@example.com"), "a plain-text email is allowed offline");
 }

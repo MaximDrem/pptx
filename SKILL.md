@@ -46,34 +46,68 @@ Each of these has already broken a real deck. They are not style advice.
 5. **Read before writing.**
    Open `patterns.md` and `examples/example-deck.html` first: slides and blocks
    come from there. Do not invent a layout while a verified pattern exists.
-6. **The render/validate loops are gates, not advice.**
-   `index.cjs deck.html --pptx` refuses to export while there are **blocking
-   errors** (exit 4, no `.pptx` is produced). Blocking = broken layout: clipped
-   text, out-of-bounds content, overlaps, invisible contrast, blank or hidden
-   slides, broken images, rows without `<br>`. Everything else the probe prints
-   is a **suggestion** (accents, spacing, emptiness, decor) — review them with
-   your eyes, fix what genuinely improves the deck, mention the rest. Every
-   content slide must have `elements > 0` and `coverage > 0` in
-    `inventory.json`. **A gate stops the loop, not the delivery**: if the same
-    blocking error survives two honest repairs (or the runtime warns about
-    repeated calls), deliver anyway with `index.cjs deck.html --pptx --force` —
-    the .pptx is produced with a loud warning — and state exactly which defects
-    remain. A delivered deck with a known defect beats a stalled run with no
-    file. For the box-markup blockers there is a mechanical repair:
-    `lint-deck.cjs deck.html --fix` converts raw `<h3>/<p>/<ul>` inside boxes
-    into runs and inserts the missing row `<br>` — run it instead of hand-editing
-    string fragments (a failed string match is not a broken tool: re-read the
-    file, or use `slide.cjs --get N` / `--set N --from -`).
+ 6. **Tools report, you decide.**
+    `index.cjs deck.html --pptx` renders, checks and exports. Only **fatal
+    render defects** stop the export (exit 4, no `.pptx`): a blank or hidden
+    slide, clipped text, a broken image, a broken stage. Everything else the
+    probe prints — overlaps, off-slide bleed, contrast, emptiness, spacing,
+    accents — is a **finding for your eyes**, not a gate: look at the render,
+    keep what is the design, fix what is a defect. lint errors are the same
+    deal: offline contract, missing files, box markup that corrupts the
+    export; lint warnings are advice. Every content slide must have
+    `elements > 0` and `coverage > 0` in `inventory.json`. **A gate stops the
+    loop, not the delivery**: if the same blocking error survives two honest
+    repairs (or the runtime warns about repeated calls), deliver anyway with
+    `index.cjs deck.html --pptx --force` — the .pptx is produced with a loud
+    warning — and state exactly which defects remain. A delivered deck with a
+    known defect beats a stalled run with no file. Fix markup in deck.html
+    itself (it is your source, not a build artifact): a failed string
+    replacement is not a broken tool — re-read the file, or edit the slide
+    fragment via `slide.cjs --get N` / `--set N --from -`.
+ 7. **The edit loop is yours, and it is bounded.**
+    Your first render usually has a few real issues — overlaps, overflow,
+    misalignment. Find them, fix deck.html, re-render, and stop: two or three
+    honest passes beat endless polishing. After staring at your own markup you
+    see what you expect rather than what rendered — look at the PNGs fresh.
+ 8. **Look before you copy, look before you deliver (vision).**
+    When a template .pptx is attached, render its slides with
+    `helpers/shots.cjs` and READ the images before extracting a style. The
+    template is the reference, not a suspect deck: its off-slide bleed, its
+    text-over-graphics, its contrast choices are the design you are copying —
+    the tools baseline them out and say so. The render→look→fix→repeat loop is
+    driven by `helpers/review.cjs`; READ its printed PNGs at every iteration
+    and once more after the export. If you cannot view images, say so and rely
+    on `validate.cjs` + the text digest.
+ 9. **Do not change `stage.css`** — the 1280×720 stage is the export contract.
+    No emoji, no external URLs/CDNs, no font shrinking to hide overflow
+    (cut the text or switch the pattern), never delete `deck.html`.
 
-7. **Look before you copy, look before you deliver (vision).**
-   When a template .pptx is attached, render its slides with
-   `helpers/shots.cjs` and READ the images before extracting a style. The
-   render→look→fix→repeat loop is driven by `helpers/review.cjs`; READ its
-   printed PNGs at every iteration and once more after the export. If you
-   cannot view images, say so and rely on `validate.cjs` + the text digest.
-8. **Do not change `stage.css`** — the 1280×720 stage is the export contract.
-   No emoji, no external URLs/CDNs, no font shrinking to hide overflow
-   (cut the text or switch the pattern), never delete `deck.html`.
+
+## Markup gotchas — write it right the first time
+
+Each of these was a real failed run. The lint catches them, but the cheap fix
+is not writing them:
+
+- **One box = one native shape.** Text inside `.card`/`.kpi`/`.pill`/`.stat`/
+  `.cell` is runs — `.t-title`/`.t-body`/`.t-cap`, `<b>`, and `<br>` between
+  rows — nothing else. A raw `<h3>`/`<p>`/`<ul>` inside the box splits it into
+  extra text shapes on export and the box style is lost; the rows also merge
+  without `<br>`. This is the #1 markup defect.
+- **The managed style block is replaced wholesale.**
+  `<style data-presentation-style="…">` is filled by the builder on every run —
+  CSS pasted into it silently disappears from the render. Your own CSS goes
+  into a second, plain `<style>` block after it.
+- **Content lives inside `.slide-pad`.** It carries the font and padding
+  contract; a slide whose content sits directly in `<section>` falls back to
+  the browser default font (Times New Roman in the render).
+- **The deck is offline.** No external URLs — an `@import` from a CDN never
+  loads and blocks the build; fonts come from the profile tokens.
+- **Art layers are pinned by z-index** (bg 0, content 1, logo/decor 2): the
+  order of `<img class="bg-img">`/`.decor-img`/`.logo` inside the slide does
+  not change what covers what. Set only `width` on photos — width+height
+  stretches them.
+- **Slides hide via `.active`, never `display:none`** — the exporter drops
+  hidden subtrees silently.
 
 ## Result contract
 
@@ -405,18 +439,19 @@ Markup rules:
   URL it finds;
 - write 8 slides or fewer in one pass; 9+ in two passes (see §3).
 
-### 4. Render loop (mandatory gate)
+### 4. Render loop (look → fix → stop)
 
 ```bash
 ... review.cjs deck.html --out-dir /tmp/deck-check
 ```
 
 `review.cjs` renders the deck, prints every `slide-NN.png` to look at, lists
-the probe findings, prints the STATIC LINT block (the same lint that gates the
-export, on the authored file), runs the artifact validator if a .pptx already
-exists, and prints the review checklist. Findings are printed as `error:`
-(blocking — must be fixed) or `suggestion:` (taste — judge visually). It also
-prints a
+the probe findings, prints the STATIC LINT block (advisory: contract errors
+plus advice on the authored file), runs the artifact validator if a .pptx
+already exists, and prints the review checklist. Findings are printed as
+`error:` (fatal — a blank, hidden, clipped or broken slide; must be fixed) or
+`suggestion:` (overlaps, bleed, contrast, spacing, emptiness — judge them
+visually: keep what is the design, fix what is a defect). It also prints a
 **structural read** of every slide (background layer, decor with coordinates,
 blocks, fills, probe issues). Use it when a suggestion needs exact numbers;
 `inspect.cjs deck.html --slide N --detail` prints the same for one slide with
@@ -427,23 +462,27 @@ The loop is:
 1. **review** — run the command;
 2. **look** — READ every printed PNG (vision). For a 10-slide deck that is 10
    images; do not skip dense slides or the cover/closing;
-3. **fix** — fix every `error:` line first, then the suggestions that make the
-   deck visibly better;
-4. **repeat** until there are no `error:` lines AND your eyes agree.
+3. **fix** — fix every `error:` line; for `suggestion:` lines decide with your
+   eyes what genuinely improves the deck;
+4. **repeat** until there are no `error:` lines AND your eyes agree — then
+   stop. Two or three honest passes are the norm; endless polishing is not.
 
-Common error → fix (never invent a workaround, never hand files to the user
-to edit):
+Finding → what it usually means (never invent a workaround, never hand files
+to the user to edit):
 
-- `BROKEN-IMAGE`: the file is missing or misnamed — copy it next to the deck
-  (`images/…`); `./images/x` and `images/x` are the same thing, do not "fix"
-  paths; fix ALL slides with that file at once;
-- `LOW-CONTRAST`: body text uses `.t-body`/`.lead` (ink/muted) — an accent
-  color is never body text;
-- `TEXT-CLIP` / `TEXT-OVERLAP`: replace fixed heights / absolute positioning
-  with a pattern;
-- `MISSING-BR`: add `<br>` between the rows inside the box;
-- `MOSTLY-EMPTY`: add a block or switch the pattern (decor does not count as
-  content);
+- `BROKEN-IMAGE` (error): the file is missing or misnamed — copy it next to
+  the deck (`images/…`); `./images/x` and `images/x` are the same thing, do
+  not "fix" paths; fix ALL slides with that file at once;
+- `TEXT-CLIP` (error): replace fixed heights / absolute positioning with a
+  pattern — text must never be cut off;
+- `LOW-CONTRAST` (suggestion): body text uses `.t-body`/`.lead` (ink/muted) —
+  an accent color is never body text; if it is the template's own look on
+  purpose, keep it and move on;
+- `TEXT-OVERLAP` (suggestion): real collision — move the block or the graphic;
+  intentional layering (a stamp over a wash) is fine, the render is the judge;
+- `MISSING-BR` (suggestion): add `<br>` between the rows inside the box;
+- `MOSTLY-EMPTY` (suggestion): add a block or switch the pattern (decor does
+  not count as content);
 - `render: the app window was destroyed` — Electron crashed; the helper
   retries once automatically. If it repeats, tell the user the app session is
   broken instead of guessing about disk space.
@@ -453,8 +492,8 @@ file — do not try N identical edits.
 
 Taste suggestions you intentionally leave (a deliberate wide spacing, an
 unaccented quote slide) do not need fixing — but say in your reply which
-suggestions you left and why. Do not build the .pptx while errors remain: the
-tool refuses anyway (exit 4).
+suggestions you left and why. Do not build the .pptx while fatal errors
+remain: the tool refuses anyway (exit 4).
 
 If you cannot view images in this environment, say so explicitly and use
 `inspect.cjs deck.html` — it prints what is on every slide (layers, decor,
@@ -468,7 +507,7 @@ blocks, fills, empty band) so you can still reason structurally.
 ```
 
 The .pptx lands next to deck.html (`artifact: <path>`). The export is refused
-(exit 4) while blocking issues exist. `validate.cjs` checks the artifact
+(exit 4) only while fatal render defects exist. `validate.cjs` checks the
 itself (empty placeholders/slides, split boxes, WCAG contrast, font sizes,
 typography, placeholders, stage size, embedded fonts, notes,
 `decor-as-background`, `visual-scarcity` …). Loop until `validate: clean`;

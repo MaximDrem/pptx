@@ -73,164 +73,6 @@ function boxInners(html, boxClass) {
   return out;
 }
 
-// ---- --fix: mechanical one-box repair -------------------------------------
-// What it does inside .card/.kpi/.pill/.stat/.cell (direct children only):
-//   <h1..h6>…</hN> → <span class="t-title">…</span>
-//   <p>…</p>       → <span class="t-body">…</span>
-//   <ul><li>a<li>b → <span class="t-body">a<br>b</span>   (ol numbers kept)
-//   adjacent row runs without a <br> between them get one (missing-br)
-// Deeper structure and everything outside the boxes is left untouched.
-
-const VOID_TAGS = new Set(["img", "hr", "input", "source", "wbr", "area", "base", "col", "embed", "track"]);
-const ROW_LIKE = new Set(["span", "b", "strong", "em", "i", "small"]);
-
-function parseAttrs(open) {
-  const attrs = {};
-  const re = /([a-zA-Z_:][-a-zA-Z0-9_:.]*)\s*=\s*(?:"([^"]*)"|'([^']*)')/g;
-  let m;
-  while ((m = re.exec(open))) attrs[m[1].toLowerCase()] = m[2] !== undefined ? m[2] : m[3];
-  return attrs;
-}
-
-// Top-level nodes of a box's inner HTML (tags with depth-aware closes).
-function topNodes(inner) {
-  const nodes = [];
-  let i = 0;
-  const openRe = /^<([a-z][a-z0-9]*)\b[^>]*>/i;
-  while (i < inner.length) {
-    if (inner[i] === "<") {
-      const m = openRe.exec(inner.slice(i));
-      if (!m) {
-        nodes.push({ type: "text", text: "<" });
-        i++;
-        continue;
-      }
-      const tag = m[1].toLowerCase();
-      if (VOID_TAGS.has(tag) || m[0].endsWith("/>")) {
-        nodes.push({ type: "el", tag, open: m[0], whole: m[0], content: "" });
-        i += m[0].length;
-        continue;
-      }
-      const closeRe = new RegExp(`</?${tag}\\b[^>]*>`, "gi");
-      closeRe.lastIndex = i + m[0].length;
-      let depth = 1;
-      let t;
-      while ((t = closeRe.exec(inner))) {
-        if (t[0][1] === "/") depth--;
-        else depth++;
-        if (depth === 0) break;
-      }
-      const end = t ? t.index + t[0].length : inner.length;
-      nodes.push({ type: "el", tag, open: m[0], whole: inner.slice(i, end), content: inner.slice(i + m[0].length, t ? t.index : inner.length) });
-      i = end;
-    } else {
-      const next = inner.indexOf("<", i);
-      const stop = next === -1 ? inner.length : next;
-      nodes.push({ type: "text", text: inner.slice(i, stop) });
-      i = stop;
-    }
-  }
-  return nodes;
-}
-
-function fixBoxInner(inner) {
-  const what = [];
-  const nodes = topNodes(inner);
-  let out = "";
-  let prevRow = false; // previous emitted node was a row run (needs <br> before the next one)
-  let pendingBreak = false; // whitespace gap since the last row run
-  for (const n of nodes) {
-    if (n.type === "text") {
-      if (n.text.trim() === "") {
-        if (prevRow) pendingBreak = true;
-        out += n.text.includes("\n") ? "\n" : n.text;
-        continue;
-      }
-      out += n.text;
-      prevRow = false;
-      pendingBreak = false;
-      continue;
-    }
-    if (n.tag === "br") {
-      out += n.whole;
-      prevRow = false;
-      pendingBreak = false;
-      continue;
-    }
-    if (/^(h[1-6]|p)$/i.test(n.tag) || n.tag === "ul" || n.tag === "ol") {
-      if (prevRow) out += "<br>";
-      const a = parseAttrs(n.open);
-      const extra = a.class ? " " + a.class : "";
-      const keep = ["style", "id", "lang", "data-role"].filter((k) => a[k]).map((k) => `${k}="${a[k]}"`).join(" ");
-      if (n.tag === "ul" || n.tag === "ol") {
-        const items = [];
-        const liRe = /<li\b[^>]*>([\s\S]*?)<\/li>/gi;
-        let li;
-        let k = 0;
-        while ((li = liRe.exec(n.content))) {
-          k++;
-          items.push((n.tag === "ol" ? `${k}. ` : "") + li[1].trim());
-        }
-        out += `<span class="t-body${extra}"${keep ? " " + keep : ""}>${items.join("<br>")}</span>`;
-        what.push(`<${n.tag}> → .t-body runs`);
-      } else {
-        const cls = /^h[1-6]$/i.test(n.tag) ? "t-title" : "t-body";
-        out += `<span class="${cls}${extra}"${keep ? " " + keep : ""}>${n.content.trim()}</span>`;
-        what.push(`<${n.tag.toLowerCase()}> → .${cls}`);
-      }
-      prevRow = true;
-      pendingBreak = false;
-      continue;
-    }
-    // any other element: keep verbatim; inline row runs still need separation
-    if (ROW_LIKE.has(n.tag)) {
-      if (prevRow && pendingBreak) out += "<br>";
-      out += n.whole;
-      prevRow = true;
-      pendingBreak = false;
-    } else {
-      out += n.whole;
-      prevRow = false;
-      pendingBreak = false;
-    }
-  }
-  return { html: out, what };
-}
-
-function fixDeck(raw) {
-  const fixes = [];
-  for (const boxClass of ["card", "kpi", "pill", "stat", "cell"]) {
-    const ranges = [];
-    const openRe = new RegExp(`<([a-z][a-z0-9]*)\\b[^>]*\\bclass=(["'])[^"']*\\b${boxClass}\\b[^"']*\\2[^>]*>`, "gi");
-    let m;
-    while ((m = openRe.exec(raw))) {
-      const tag = m[1];
-      const start = m.index + m[0].length;
-      const tagRe = new RegExp(`</?${tag}\\b[^>]*>`, "gi");
-      tagRe.lastIndex = start;
-      let depth = 1;
-      let t;
-      while ((t = tagRe.exec(raw))) {
-        if (t[0][1] === "/") depth--;
-        else depth++;
-        if (depth === 0) break;
-      }
-      const end = t ? t.index : raw.length;
-      const slide = (raw.slice(0, m.index).match(/<section\b/gi) || []).length;
-      ranges.push({ start, end, inner: raw.slice(start, end), slide });
-    }
-    for (let i = ranges.length - 1; i >= 0; i--) {
-      const r = ranges[i];
-      const fixed = fixBoxInner(r.inner);
-      if (fixed.html !== r.inner) {
-        raw = raw.slice(0, r.start) + fixed.html + raw.slice(r.end);
-        fixes.push({ slide: r.slide, boxClass, what: fixed.what });
-      }
-    }
-  }
-  return { html: raw, fixes };
-}
-
 function lintDeck(deckPath, opts = {}) {
   const errors = [];
   const warnings = [];
@@ -260,9 +102,10 @@ function lintDeck(deckPath, opts = {}) {
     );
   }
 
-  // 0b. Template fidelity: if the deck copies a saved style profile that has
-  //     assets, the deck must actually use at least one of them (real runs
-  //     copied only the tokens and lost every element of the original).
+  // 0b. Template fidelity — ADVICE, not a gate: the user asked for this
+  //     template's style, and a copy that drops its art stops reading as that
+  //     style. The tools report the gap; whether and where to place the art is
+  //     the agent's judgement (see images/template-assets.md).
   const profileMatch = /data-presentation-style=(["'])profile:([^"']+)\1/.exec(raw);
   if (profileMatch) {
     const stylesDir = process.env.PRESENTATION_STYLES_DIR || path.join(os.homedir(), ".wsc", "config", "styles");
@@ -275,14 +118,11 @@ function lintDeck(deckPath, opts = {}) {
     }
     const imgCount = (raw.match(/<img\b/gi) || []).length;
     if (hasAssets && imgCount === 0) {
-      errors.push(
-        `template profile «${profileMatch[2].trim()}» has assets but the deck uses none — reuse the template's background/logo/decor: ` +
-          `run style-profile.cjs <template.pptx> --name "…" --deploy <this deck's folder> and paste the snippets from images/template-assets.md`,
+      warnings.push(
+        `template profile «${profileMatch[2].trim()}» has assets but the deck uses none — a copy without the template's background/logo/decor stops reading as its style. ` +
+          `run style-profile.cjs <template.pptx> --name "…" --deploy <this deck's folder> and reuse the snippets from images/template-assets.md`,
       );
     }
-    // A copy that keeps only the background loses the recognisable decor; a
-    // copy that keeps only the boxes leaves the background flat — both were
-    // real failures. The profile knows which roles it has.
     let extracted = [];
     let imageBgTemplate = 0;
     let templateSlides = 0;
@@ -298,19 +138,19 @@ function lintDeck(deckPath, opts = {}) {
     const hasBg = extracted.some((a) => a.role === "background");
     const usesDecor = /class=(["'])[^"']*\b(?:decor|decor-img)\b/.test(raw);
     if (hasDecor && !usesDecor) {
-      errors.push(
+      warnings.push(
         `template profile «${profileMatch[2].trim()}» has decor assets but the deck uses none — the copy loses the original's recognisable elements. ` +
-          `Place at least one deployed decor anywhere sensible, e.g. ` +
+          `One deployed decor anywhere sensible already helps, e.g. ` +
           `<img class="decor-img" style="left:1080px; top:-80px; width:260px" src="images/template-decor-1.png" alt=""> ` +
           `(exact names in images/template-assets.md; position, size and the choice of decor are yours)`,
       );
     }
     const usesBg = /class=(["'])[^"']*\bbg-img\b/.test(raw) || /background-image\s*:/.test(raw);
     if (hasBg && !usesBg) {
-      errors.push(
-        `template profile «${profileMatch[2].trim()}» uses an image background but the deck has none — a flat fill is not a style copy. ` +
-          `Add <img class="bg-img" src="images/template-bg-1.png" alt=""> as the first child of the slides that have it in the template ` +
-          `(or set background-image yourself); use a token background only if the template is flat`,
+      warnings.push(
+        `template profile «${profileMatch[2].trim()}» uses an image background but the deck has none — a flat fill reads as a different deck. ` +
+          `Add <img class="bg-img" src="images/template-bg-1.png" alt=""> to the slides that carry one in the template ` +
+          `(or set background-image yourself); a token background is fine only if the template is flat`,
       );
     }
     if (hasBg && imageBgTemplate >= Math.max(2, templateSlides * 0.4)) {
@@ -318,13 +158,20 @@ function lintDeck(deckPath, opts = {}) {
       const withBg = slideBodies.filter((b) => /class=(["'])[^"']*\bbg-img\b/.test(b) || /background-image\s*:/.test(b)).length;
       const need = Math.ceil(slideBodies.length * 0.5);
       if (slideBodies.length > 0 && withBg < need) {
-        errors.push(
-          `template profile «${profileMatch[2].trim()}» uses image backgrounds on its slides, but the deck has a background on only ${withBg} of ${slideBodies.length} — flat slides read as a different deck. ` +
-            `Put a background on at least ${need} slides: <img class="bg-img" src="images/template-bg-N…" alt=""> as the first child of the slide ` +
-            `(images/template-assets.md says which background belongs to which slide type; use one or two ` +
-            `different backgrounds instead of a flat fill)`,
+        warnings.push(
+          `template profile «${profileMatch[2].trim()}» uses image backgrounds on its slides, but the deck has one on only ${withBg} of ${slideBodies.length}. ` +
+          `images/template-assets.md says which background belongs to which slide type — put it on the slides that need it (one or two different backgrounds, not a flat fill everywhere)`,
         );
       }
+    }
+    // The managed style block is replaced wholesale by expand-styles at build
+    // time: CSS pasted into it silently disappears from the render.
+    const managedCss = /<style\b[^>]*\bdata-presentation-style=(["'])[^"']*\1[^>]*>([\s\S]*?)<\/style>/i.exec(raw);
+    if (managedCss && managedCss[2].trim()) {
+      warnings.push(
+        `the <style data-presentation-style="…"> block has CSS in it — the build replaces that block wholesale, so this CSS never reaches the render. ` +
+          `Move it to a second, plain <style> block (deck-owned CSS is never touched)`,
+      );
     }
   }
 
@@ -405,13 +252,13 @@ function lintDeck(deckPath, opts = {}) {
     if (role !== "content") continue;
     const body = sec[2];
     if (!/class=(["'])[^"']*\bheadline\b/.test(body)) {
-      errors.push(`slide ${secIndex}: no .headline — content slides use the heading pattern (.kicker + .headline), not a raw <h2>`);
+      warnings.push(`slide ${secIndex}: no .headline — content slides use the heading pattern (.kicker + .headline), not a raw <h2>`);
     }
     if (!/<div[^>]*class=(["'])[^"']*\bcontent\b/.test(body)) {
-      errors.push(`slide ${secIndex}: no <div class="content"> — blocks live inside the content wrapper`);
+      warnings.push(`slide ${secIndex}: no <div class="content"> — blocks live inside the content wrapper`);
     }
     if (!PATTERN_BLOCK.test(body)) {
-      errors.push(
+      warnings.push(
         `slide ${secIndex}: no block from patterns.md (card/kpi-row/grid/split/flow/timeline/table/steps/donut/matrix/list) — raw <p>/<ul> is not a pattern; take the markup from patterns.md`,
       );
     }
@@ -427,8 +274,8 @@ function lintDeck(deckPath, opts = {}) {
         if (!rawTag) continue;
         errors.push(
           `slide ${secIndex}: raw <${rawTag[1].toLowerCase()}> inside .${boxClass} — box text must be runs (.t-title/.t-body/.t-cap, <b>, <br>), nothing else in the box (export merge + style; patterns.md → One-box rule). ` +
-            `Run the mechanical fix: lint-deck.cjs ${path.basename(file)} --fix (converts the box blocks into runs and adds the row <br> automatically), or replace by hand: ` +
-            `<${rawTag[1].toLowerCase()}>text</${rawTag[1].toLowerCase()}> → <span class="${/^h[1-6]$/.test(rawTag[1].toLowerCase()) ? "t-title" : "t-body"}">text</span>; rows are separated by <br>, not by block tags`,
+            `Fix it in deck.html (your source, not the build): <${rawTag[1].toLowerCase()}>text</${rawTag[1].toLowerCase()}> → <span class="${/^h[1-6]$/.test(rawTag[1].toLowerCase()) ? "t-title" : "t-body"}">text</span>; rows are separated by <br>, not by block tags. ` +
+            `Per-slide edits: slide.cjs deck.html --get ${secIndex} > /tmp/slide-${secIndex}.html, edit the fragment, slide.cjs deck.html --set ${secIndex} --from /tmp/slide-${secIndex}.html`,
         );
         break;
       }
@@ -465,12 +312,15 @@ function lintDeck(deckPath, opts = {}) {
   }
   const ignored = new Set(["lucide", "cover", "closing", "section", "quote"]); // role words used as classes in the skeleton
   let unknown = Array.from(used).filter((c) => !defined.has(c) && !ignored.has(c));
-  const managedEmpty = /<style\b[^>]*\bdata-presentation-style=(["'])[^"']*\1[^>]*>\s*<\/style>/i.test(raw);
-  if (managedEmpty) {
+  // A managed style block (empty or not) means the canonical CSS enters at
+  // build time via expand-styles — its classes are defined even though the
+  // authored file does not contain them.
+  const hasManaged = /<style\b[^>]*\bdata-presentation-style=/i.test(raw);
+  if (hasManaged) {
     const canon = loadCanonicalClasses();
     unknown = unknown.filter((c) => !canon.has(c));
   }
-  if (unknown.length && (styleBlocks.length || managedEmpty)) {
+  if (unknown.length && (styleBlocks.length || hasManaged)) {
     warnings.push(
       "class(es) used but not defined in the deck's <style> or the canonical CSS (silent fallback — typo or missing paste): " +
         unknown.slice(0, 12).join(", ") +
@@ -486,26 +336,10 @@ function lintDeck(deckPath, opts = {}) {
 }
 
 function main() {
-  const argv = process.argv.slice(2);
-  const fix = argv.includes("--fix");
-  const args = argv.filter((a) => !a.startsWith("--"));
+  const args = process.argv.slice(2).filter((a) => !a.startsWith("--"));
   if (!args.length) {
-    console.error("usage: lint-deck.cjs <deck.html> [--fix]");
+    console.error("usage: lint-deck.cjs <deck.html>");
     process.exit(2);
-  }
-  if (fix) {
-    const file = path.resolve(args[0]);
-    const before = fs.readFileSync(file, "utf8");
-    const { html, fixes } = fixDeck(before);
-    if (fixes.length) {
-      fs.writeFileSync(file, html);
-      for (const f of fixes) {
-        console.log(`fix: slide ${f.slide || 1} .${f.boxClass}: ${f.what.length ? f.what.join(", ") : "row <br> added"}`);
-      }
-      console.log(`fix: ${fixes.length} box(es) repaired — review the diff, then lint again`);
-    } else {
-      console.log("fix: nothing to repair (no raw block tags or missing row <br> in boxes)");
-    }
   }
   const r = lintDeck(args[0]);
   if (r.errors.length) process.exit(1);
@@ -521,4 +355,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { lintDeck, fixDeck };
+module.exports = { lintDeck };

@@ -257,25 +257,18 @@ async function run(
     )
     writeFileSync(inventoryPath, JSON.stringify({ file: deck, slides: inventory }, null, 2))
 
-    // Blocking layout issues stop the export: a deck with hidden, clipped or
-    // overlapping slides must be fixed first. Exit 4 — the .pptx is not
-    // produced at all, so an empty/broken deck cannot be delivered.
-    // Only contract violations block the export: probe marks each issue with a
-    // severity (errors = structural correctness, warnings = taste hints that
-    // the model reviews visually). The fallback set keeps older probes safe.
+    // Only fatal render defects stop the export: blank, hidden, clipped or
+    // broken slides. Overlaps, off-slide bleed, contrast and emptiness are
+    // suggestions the model judges visually — gates that over-police stalled
+    // real runs (they flagged the template's own design as errors).
     const BLOCKING = new Set([
       "text-clip",
-      "out-of-bounds",
-      "text-overlap",
-      "low-contrast",
       "blank",
       "maybe-blank",
-      "mostly-empty",
       "broken-image",
       "stage-broken",
       "probe-error",
       "hidden-slide",
-      "missing-br",
     ])
     const isBlocking = (i: { type: string; severity?: string }) => (i.severity ? i.severity === "error" : BLOCKING.has(i.type))
     const countBy = (fn: (i: { type: string; severity?: string }) => boolean) =>

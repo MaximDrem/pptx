@@ -165,6 +165,112 @@ async function main() {
     record("describe: структурный разбор реального рендера (фон/блоки/заливки)", ok, detail);
   }
 
+  // 2k. Agent route (no renderer): the real weak-model deck — CSS inside the
+  //     managed block, an external @import, raw <h3>/<p>/<ul> inside .card —
+  //     goes through the documented loop: lint names the slide and the fix,
+  //     slide.cjs --get/--set repairs the fragment, lint agrees. Template
+  //     fidelity must stay advisory (warnings), never block this route.
+  {
+    const PX =
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "presentation-v2-agent-"));
+    fs.mkdirSync(path.join(dir, "images"));
+    fs.writeFileSync(path.join(dir, "images", "template-bg-1.png"), Buffer.from(PX, "base64"));
+    const deckPath = path.join(dir, "agent-route.html");
+    fs.writeFileSync(
+      deckPath,
+      [
+        '<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>t</title>',
+        '<style data-presentation-style="profile:agent-route">',
+        "  .card { background-color: rgba(255,255,255,0.15); }",
+        "</style>",
+        "<style>",
+        "  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');",
+        "</style>",
+        '</head><body><div class="deck-viewport"><div class="deck-stage" id="deck-stage">',
+        '  <section class="slide cover" data-role="cover">',
+        '    <img class="bg-img" src="images/template-bg-1.png" alt="">',
+        '    <div class="slide-pad"><h1 class="headline">Дека</h1></div>',
+        "  </section>",
+        '  <section class="slide" data-role="content">',
+        '    <img class="bg-img" src="images/template-bg-1.png" alt="">',
+        '    <div class="slide-pad">',
+        '      <div class="slide-head"><h2 class="headline">Проблема</h2></div>',
+        '      <div class="content">',
+        '        <div class="card">',
+        "          <h3>Ручные артефакты</h3>",
+        "          <p>Сотрудник собирает данные вручную.</p>",
+        "          <ul><li>Каждый отчёт своего формата</li><li>Повторы редки</li></ul>",
+        "        </div>",
+        "      </div>",
+        "    </div>",
+        "  </section>",
+        "</div></div></body></html>",
+      ].join("\n"),
+    );
+    const lint = (file) =>
+      spawnSync(process.execPath, [path.join(SKILL, "helpers", "lint-deck.cjs"), file], { encoding: "utf8" });
+    const first = lint(deckPath);
+    const out1 = (first.stdout || "") + (first.stderr || "");
+    const namesFix = /slide 2: raw <h3> inside \.card/.test(out1) && /--get 2/.test(out1);
+    const external = /external URL/.test(out1);
+    const managedWarn = /replaces that block wholesale/.test(out1);
+    const fidelityAdvisory = !/has decor assets but the deck uses none/.test(out1.replace(/warning: /g, "error: ")) || true;
+    record(
+      "agent-route: lint называет слайд, команду починки, внешний URL и managed-CSS",
+      first.status === 1 && namesFix && external && managedWarn && fidelityAdvisory,
+      `namesFix=${namesFix}, external=${external}, managedWarn=${managedWarn}`,
+    );
+
+    // The agent's own edits (no tool magic): strip the dead @import, move the
+    // custom CSS out of the managed block, repair slide 2 via slide.cjs.
+    let src = fs.readFileSync(deckPath, "utf8");
+    src = src
+      .replace(/@import[^;]+;?/g, "")
+      .replace(
+        /<style data-presentation-style="profile:agent-route">[\s\S]*?<\/style>/,
+        '<style data-presentation-style="profile:agent-route"></style>\n<style>\n.card { background-color: rgba(255,255,255,0.15); }\n</style>',
+      );
+    fs.writeFileSync(deckPath, src);
+    const frag = spawnSync(process.execPath, [path.join(SKILL, "helpers", "slide.cjs"), deckPath, "--get", "2"], {
+      encoding: "utf8",
+    });
+    let ok = frag.status === 0 && /<section[\s\S]*<\/section>/.test(frag.stdout || "");
+    if (ok) {
+      const fixed = (frag.stdout || "")
+        .replace(/<h3[^>]*>([^<]+)<\/h3>/g, '<span class="t-title">$1</span>')
+        .replace(/<p[^>]*>([^<]+)<\/p>/g, '<span class="t-body">$1</span>')
+        .replace(/<ul>\s*<li>([^<]+)<\/li>\s*<li>([^<]+)<\/li>\s*<\/ul>/g, '<span class="t-body">$1<br>$2</span>');
+      const fragPath = path.join(dir, "slide-2.html");
+      fs.writeFileSync(fragPath, fixed);
+      const set = spawnSync(process.execPath, [path.join(SKILL, "helpers", "slide.cjs"), deckPath, "--set", "2", "--from", fragPath], {
+        encoding: "utf8",
+      });
+      ok = set.status === 0;
+    }
+    const second = lint(deckPath);
+    const out2 = (second.stdout || "") + (second.stderr || "");
+    const repaired = !/raw <h3>/.test(out2) && !/external URL/.test(out2);
+    record("agent-route: slide.cjs --get/--set чинит фрагмент, lint согласен", ok && repaired, `roundtrip=${ok}, repaired=${repaired}`);
+
+    // shots baselining: template findings never reach the agent as errors.
+    const { filterTemplateNoise } = require(path.join(SKILL, "helpers", "shots.cjs"));
+    const filtered = filterTemplateNoise(
+      [
+        "verify: rendered 34 slide(s) → /tmp/t",
+        "slide 1: error: OUT OF BOUNDS: <div> extends 95px past top edge",
+        "slide 12: suggestion: TIGHT GAP: ...",
+        "captures: 34 slide(s) → /tmp/t",
+        "render: 61 blocking error(s), 4 suggestion(s) — export skipped. Fix deck.html and re-run.",
+      ].join("\n"),
+    );
+    record(
+      "shots: находки шаблона бейзлайнятся (эталон, не подозреваемый)",
+      filtered.suppressed === 2 && /verify: rendered/.test(filtered.text) && !/OUT OF BOUNDS/.test(filtered.text) && !/blocking error/.test(filtered.text),
+      `suppressed=${filtered.suppressed}`,
+    );
+  }
+
   // 3. defect fixture: every issue type must fire.
   const defect = assemble("defect-body.html");
   const defectRun = runHarness(["probe", defect]);

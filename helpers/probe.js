@@ -836,22 +836,19 @@
     }
   }
 
-  // Severity: only contract violations block the export (exit 4). Taste and
-  // quality hints are suggestions — the model reviews them visually and fixes
-  // what it agrees with (this is how SOTA skills balance lint vs judgement).
+  // Severity: ONLY fatal render defects block the export (exit 4) — a slide
+  // that is blank, hidden, clipped or broken. Everything else (overlaps,
+  // off-slide bleed, contrast, emptiness, spacing, accents) is a suggestion:
+  // the agent reviews it with its eyes and decides. Over-policing here used
+  // to stall real runs: the gates flagged the template's own design.
   const ERROR_TYPES = new Set([
     "text-clip",
-    "out-of-bounds",
-    "text-overlap",
-    "low-contrast",
     "blank",
     "maybe-blank",
-    "mostly-empty",
     "broken-image",
     "stage-broken",
     "probe-error",
     "hidden-slide",
-    "missing-br",
   ]);
   const withSeverity = (issue) => ({ ...issue, severity: ERROR_TYPES.has(issue.type) ? "error" : "warning" });
 

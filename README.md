@@ -87,8 +87,9 @@ deck.html ──┬─ expand-styles.cjs  canonical CSS into the managed style b
 - notes — `<template data-pptx-notes>` inside the slide;
 - fonts — vendored only (`fonts/`); hex colors — only in tokens;
 - every row inside a filled box is separated by `<br>` (one-box rule);
-- the export is blocked (exit 4) while blocking layout issues exist, so an
-  empty/broken deck cannot be delivered;
+- the export is blocked (exit 4) only by fatal render defects (blank/hidden/
+  clipped/broken slides), so an empty or broken deck cannot be delivered —
+  everything else is advice the agent judges visually;
 - no internet and no chat tools inside the deck/helpers.
 
 ## Provenance and licenses

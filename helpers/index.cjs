@@ -13,7 +13,7 @@
 //                         single-file HTML
 //
 // Exit codes: 0 clean · 1 lint/assets/styles errors · 2 render failed to start ·
-// 3 render/export crashed · 4 blocking layout issues — export skipped.
+// 3 render/export crashed · 4 fatal render defects — export skipped.
 // --force is the last resort: after two honest fix attempts it exports despite
 // blocking findings (loud warning) so the user still gets a .pptx; state the
 // remaining defects in the summary. A delivered deck with a stated defect beats

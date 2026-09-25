@@ -527,17 +527,12 @@ function mergeHtmlReport(rep, out) {
         ? issue.severity === "error"
         : [
             "text-clip",
-            "out-of-bounds",
-            "text-overlap",
-            "low-contrast",
             "blank",
             "maybe-blank",
-            "mostly-empty",
             "broken-image",
             "stage-broken",
             "probe-error",
             "hidden-slide",
-            "missing-br",
           ].includes(issue.type);
       if (isError) {
         out.errors.push({ slide: slide.index + 1, check: "html:" + issue.type, detail });
