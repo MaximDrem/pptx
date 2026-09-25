@@ -58,7 +58,7 @@ async function main() {
 
   // 1b. Pure-node unit tests (no browser): pptx-post offset, artifact checks,
   //     render report/artifact contract.
-  for (const unit of ["pptx-post.test.cjs", "validate-checks.test.cjs", "render-report.test.cjs", "lint-deck.test.cjs", "expand-styles.test.cjs", "review.test.cjs", "helpers-contract.test.cjs", "describe.test.cjs"]) {
+  for (const unit of ["pptx-post.test.cjs", "validate-checks.test.cjs", "render-report.test.cjs", "lint-deck.test.cjs", "expand-styles.test.cjs", "review.test.cjs", "helpers-contract.test.cjs", "describe.test.cjs", "style-profile.test.cjs"]) {
     const u = spawnSync(process.execPath, [path.join(__dirname, "..", "unit", unit)], { encoding: "utf8", timeout: 60000 });
     const tail = ((u.stdout || "") + (u.stderr || "")).trim().split("\n").pop() || "";
     record(`unit ${unit}`, u.status === 0, tail.slice(0, 180));

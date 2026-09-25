@@ -20,9 +20,12 @@ const { describeDeck } = require("./lib/describe.cjs");
 const CHECKLIST = [
   "1. Nothing clipped, overlapping or half-empty — compare with the probe lines above.",
   "2. The style is the SAME on every slide (no random flat-color slides, one palette).",
-  "3. Cover/sections: cover-art glow and decor are in place; the logo sits in its corner.",
+  "3. Cover/sections: cover-art glow and decor are in place; the logo sits in its corner;",
+  "   branding lockups are not repeated and never placed over the logo.",
   "4. Every content slide has a visual anchor: icon, chart, big number or photo.",
-  "5. Template mode: put the matching reference shot next to your slide — same family?",
+  "5. Template mode: put the matching reference shot next to your slide (same family?),",
+  "   and follow the manifest's Layout recipe — vary decor coordinates and box styles",
+  "   (.card/.deep/.tint/.ghost) the way the original does, no identical square wall.",
   "6. Nothing reads as generic AI slop: no bars under titles, no wall of identical cards,",
   "   no centered body copy, no emoji, no stretched decor used as a background.",
 ];

@@ -199,6 +199,22 @@ function lintDeck(deckPath, opts = {}) {
         `slide ${secIndex}: no block from patterns.md (card/kpi-row/grid/split/flow/timeline/table/steps/donut/matrix/list) — raw <p>/<ul> is not a pattern; take the markup from patterns.md`,
       );
     }
+    // One-box rule: text inside a painted box is runs (.t-title/.t-body/.t-cap
+    // + <br>), never raw <h3>/<p>/<ul>. Block tags split the box into extra
+    // text shapes and lose the box style on export (real case: the model fell
+    // back to raw HTML inside .card and the copy stopped looking like the
+    // template).
+    const boxRe = /<(div|article|li)\b[^>]*\bclass=(["'])[^"']*\b(card|kpi|pill|stat|step|quote)\b[^"']*\2[^>]*>([\s\S]*?)<\/\1>/gi;
+    let box;
+    while ((box = boxRe.exec(body))) {
+      const rawTag = /<(h[1-6]|p|ul|ol)\b/i.exec(box[4]);
+      if (rawTag) {
+        errors.push(
+          `slide ${secIndex}: raw <${rawTag[1].toLowerCase()}> inside .${box[3]} — box text must be runs (.t-title/.t-body/.t-cap, <b>, <br>), nothing else in the box (export merge + style; patterns.md → One-box rule)`,
+        );
+        break;
+      }
+    }
     if (!/class=(["'])[^"']*\bfooter\b/.test(body)) {
       warnings.push(`slide ${secIndex}: no .footer — the numbering/anchor is lost (add <div class="footer">…</div>)`);
     }

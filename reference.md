@@ -128,14 +128,34 @@ skill updates):
 - `assets/` — background/decorative files the style relied on.
 
 With `--deploy <deck-dir>` the role-key art is also copied next to the deck as
-`images/template-bg.<ext>`, `images/template-logo.<ext>`,
-`images/template-decor-N.<ext>` and `images/template-assets.md` is written with
-paste-ready snippets:
+`images/template-bg-N.<ext>`, `template-logo.<ext>`, `template-decor-N.<ext>`,
+`template-photo-N.<ext>`, `template-icon-N.<ext>`, `template-brand-N.<ext>` and
+`images/template-assets.md` is written with paste-ready snippets and a map.
+Key mode deploys up to 20 assets (backgrounds 4, decor 6, photos 2, icons 4,
+logo 1); the slide-1 background is ranked first and marked `(cover)`, so the
+cover art is never ranked out. The manifest sections:
+
+- **Background / Logo** — where each appears on template slides (px, 1-based
+  slide numbers) and the corner class for the logo (`pos-tl` when the template
+  keeps it left);
+- **Branding lockup** — a near-white, wide brand mark. It is NOT decor: the
+  template places it once (usually the cover) and it must never be stacked on
+  the logo;
+- **Decor / Photo / Icon** — every element with all its template placements
+  (position, size, rotation). Coordinates are hints: the template itself moves,
+  mirrors, scales and bleeds decor, and stacks two elements on one slide; the
+  deck should vary them too. Square photos get `class="decor-img round"`;
+- **Box styles** — the template's distinct box fills (`--c-surface`,
+  `--c-surface-2` → `.card.deep`, plus `.tint/.ghost/.inverse`) with the slides
+  they come from;
+- **Layout recipes** — per template slide: background, art (mapped to the
+  deployed names), box fills and the first text. Use it to mirror a KPI row, a
+  flow, a photo-led slide instead of repeating one grid.
 
 ```html
-<img class="bg-img" src="images/template-bg.png" alt="">      <!-- first child of the slide -->
-<img class="logo" src="images/template-logo.png" alt="Logo">   <!-- top-right; .pos-tl/.lg -->
-<img class="decor-img pos-tr" src="images/template-decor-1.png" alt="">
+<img class="bg-img" src="images/template-bg-1.png" alt="">          <!-- first child of the slide -->
+<img class="logo pos-tl" src="images/template-logo.svg" alt="Logo"> <!-- template's corner -->
+<img class="decor-img" style="left:766px; top:-224px; width:444px" src="images/template-decor-1.png" alt="">
 ```
 
 `lint-deck` fails a profile-styled deck that uses none of the profile assets
@@ -160,6 +180,9 @@ merges all runs of a box into a single `<a:p>`, so without `<br>` PowerPoint
 shows the title and the body on one line (probe check `missing-br`).
 
 Acceptance tests: `single-box` and `flow-узлы` in `tests/local/run-local.cjs`.
+`lint-deck` also fails raw `<h3>/<p>/<ul>` inside `.card/.step/.kpi/.pill/.stat`
+(`raw <h3> inside .card`) — writing box text with block tags is the same defect
+found earlier, when the model fell back to raw HTML for a template copy.
 
 ## validate.cjs — self-reflection report (the main verification tool)
 
@@ -380,7 +403,8 @@ URIs. Use `--inline` only when a single-file HTML is explicitly needed.
 `lint-deck` catches: `http(s)://`, protocol-relative `//host/...` and `file:`
 (the deck is offline), `gigachat_image(` and other chat-tool calls (they must
 not live in the deck), missing files, classes without a definition in `<style>`
-(silent layout breakage), slides without `data-role`.
+(silent layout breakage), slides without `data-role`, raw `<h2>/<p>/<ul>` slides
+(pattern discipline) and raw block tags inside a pattern box (one-box rule).
 
 ## styles? charts?
 

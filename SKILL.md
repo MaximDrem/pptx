@@ -155,23 +155,29 @@ Then, **in this order**:
      background — match by slide type. A token bg is only for flat templates;
    - the profile already reproduces the template's content boxes: `--c-surface`
      holds the template's own card fill (usually a translucent white/black,
-     e.g. `rgba(255,255,255,0.15)`), so plain `.card` looks native. For accent
-     highlights use `.card.tint` (translucent accent); a solid `.card.accent`
-     is for at most ONE short key message per slide — never a wall of filled
-     boxes (probe suggests `accent-cards`);
-   - `<img class="logo" src="images/template-logo…" alt="Logo">` in the corner
-     where the template keeps it (top-right by default; `.pos-tl`/`.lg`); add
-     `with-logo` to the slide class — it reserves the top band for the logo;
-   - `<img class="decor-img" src="images/template-decor-…" alt="">` for the
-     template's illustrations. The map's coordinates are HINTS, not a
-     mandate: move, resize, mirror or bleed the decor, swap in another
-     deployed decor, or borrow a motif from another template slide — as long
-     as (a) at least one template decor element is used and (b) decor never
-     collides with text (probe errors on overlap: bleed it off an edge with
-     negative offsets, shrink it, or pick another decor) and never becomes a
-     full-slide background. Do not place the same large decor on every slide —
-     it will fight the content; cover-art + one decor on cover/closing is
-     usually enough.
+     e.g. `rgba(255,255,255,0.15)`), so plain `.card` looks native. The
+     manifest's **Box styles** section lists the runner-up fill too: alternate
+     `.card` / `.card.deep` / `.card.tint` / `.card.ghost` / `.card.inverse`
+     the way the template does — the same box on every slide is the
+     monotonous-copy failure (probe suggests `accent-cards` when overdone; a
+     solid `.card.accent` is for at most ONE short key message per slide);
+   - `<img class="logo" …>` in the corner the manifest prints — corporate
+     templates usually keep it TOP-LEFT, so paste `class="logo pos-tl"` and
+     add `with-logo` to the slide class (it reserves the top band). A
+     **Branding lockup** is a separate section: near-white brand art that goes
+     where the template puts it (usually once, on the cover) — it is NOT
+     decor: never repeat it and never place it over the logo;
+   - `<img class="decor-img" …>` for decor, photos and icons. The map's
+     coordinates are HINTS: the template never repeats decor at identical
+     coordinates — it stacks elements (a blob under an arrow), mirrors, scales
+     or bleeds them off an edge. Do the same: move/resize/pick another element
+     per slide, keep at least one template decor, and never let art cover text
+     (bleed it off an edge with negative offsets or swap it). Square photos in
+     the **Photo** section crop as circles (`class="decor-img round"`);
+   - the **Layout recipes** section lists what the template composes per slide
+     (background + art + boxes + title). Match the recipe to the section you
+     are building — a KPI row, a flow, a photo-led slide — instead of putting
+     every section on the same grid.
    If `template-assets.md` says the template has no reusable art (a flat
    token-only style), say so and move on.
 5. Build the deck with `data-presentation-style="profile:<slug>"`. Keep the
@@ -230,12 +236,20 @@ rewrites the complete file.
 - read `deck.html` first: it stays small — images are relative `images/…`
   paths and styles live in the managed block, so a fresh Read gives exact
   anchors (never retype big fragments from memory);
-- anchor on unique text: the previous slide's footer
-  (`<div class="footer"><span>Section</span><span>NN</span></div>`) or a whole
-  element (opening + closing tag) — never on a bare `</section>`;
-- if an edit still fails, re-read the exact lines, retry with a larger unique
-  context, or rewrite the complete file (it is small). Never ask the user
-  about edit mechanics.
+- **the repeating-markup trap**: the slide opening, logo and decor lines are
+  IDENTICAL on every slide, so an anchor that is not the slide's own text
+  matches 3–10 places and the edit fails. Always anchor on the unique
+  headline/footer of the slide you mean;
+- anchor on a whole element (opening + closing tag) — never on a bare
+  `</section>`;
+- **never invent asset names**: list `images/` or read
+  `images/template-assets.md` before referencing `template-*` — a guessed
+  `template-bg.png` instead of `template-bg-1.png` fails lint/assets and
+  wastes a render cycle;
+- **after the FIRST failed edit, stop editing surgically**: re-read the file
+  and rewrite it completely in one write call (it is tens of KB). A second
+  "bigger context" attempt is how turns get burned. Never ask the user about
+  edit mechanics.
 
 ```html
 <!doctype html>
@@ -271,7 +285,9 @@ Markup rules:
   they are what produce "no accents / empty regions / mostly empty" decks;
 - **one-box rule**: text inside a colored box is written as runs directly in
   the box (`.t-title/.t-body/.t-cap`, `<b>`, `<br>`) with nothing else in the
-  box; icons/badges go next to it via `.card-stack`. **Separate every row
+  box; icons/badges go next to it via `.card-stack`. Raw `<h3>/<p>/<ul>`
+  inside `.card/.step/.kpi/.pill/.stat` is a lint error — it splits the box
+  into extra shapes and loses its style. **Separate every row
   boundary with `<br>`** — without it the exporter merges the runs into one
   paragraph (probe blocks `missing-br`);
 - **accent budget**: every content slide carries at least one emphasis accent
@@ -419,10 +435,15 @@ Across the deck:
   are the same grid of boxes, change some to another pattern from `patterns.md`
   (split, flow, kpi-row, timeline, table, quote) or make one of them a picture
   slide. A deck of identical squares is the #1 "generated, not designed" tell;
+- **box variety**: in template mode the manifest's Box styles list several
+  fills — if every card is the same surface, switch some to
+  `.card.deep/.tint/.ghost`; the original template mixes them;
 - **template art**: in template mode, name the deployed element you used on the
   cover and on a content slide (the structural read's TEMPLATE ASSETS block
   shows what is where). If `template-decor-*` exists and appears nowhere, place
-  it on the cover/section/closing (bleed it off an edge if it collides);
+  it on the cover/section/closing (bleed it off an edge if it collides). If you
+  reused one decor, its coordinates must not be identical on every slide, and
+  text must stay readable on top of it;
 - **pictures**: if the deck has no photo and the topic allows one, generate 1–3
   images with the chat image tool (e.g. `gigachat_image`/`text2image`) and use
   them on the cover or a key content slide — a big picture is what makes a

@@ -149,11 +149,13 @@ function pickColors(deck) {
   // Better evidence: if the template paints its content boxes with a specific
   // fill (usually a translucent white/black), reuse it — otherwise the copied
   // cards look nothing like the original (real incident: flat navy cards vs
-  // the template's rgba(255,255,255,0.15) boxes).
+  // the template's rgba(255,255,255,0.15) boxes). Keep the runner-up fills too:
+  // templates usually mix 2–3 box styles, and a copy with one style everywhere
+  // reads as monotonous (real case: identical grey squares on every slide).
   const fillCount = new Map();
   const boxAreaMin = deck.slideSize.emu.cx * deck.slideSize.emu.cy * 0.005;
   const boxAreaMax = deck.slideSize.emu.cx * deck.slideSize.emu.cy * 0.8;
-  const walkFills = (els) => {
+  const walkFills = (els, slideNo) => {
     for (const el of els || []) {
       const f = el.fill;
       const b = el.box && el.box.emu;
@@ -162,24 +164,31 @@ function pickColors(deck) {
         const alpha = f.alpha === undefined ? 1 : f.alpha;
         const key = `${f.hex}:${alpha}`;
         if (a >= boxAreaMin && a <= boxAreaMax && !(alpha < 0.05)) {
-          if (!fillCount.has(key)) fillCount.set(key, { hex: f.hex, alpha, count: 0 });
-          fillCount.get(key).count++;
+          if (!fillCount.has(key)) fillCount.set(key, { hex: f.hex, alpha, count: 0, slides: new Set() });
+          const rec = fillCount.get(key);
+          rec.count++;
+          if (slideNo) rec.slides.add(slideNo);
         }
       }
-      if (el.children) walkFills(el.children);
+      if (el.children) walkFills(el.children, slideNo);
     }
   };
-  for (const s of deck.slides) walkFills(s.elements);
+  for (const s of deck.slides) walkFills(s.elements, (s.index ?? 0) + 1);
   const topFills = [...fillCount.values()].sort((a, b) => b.count - a.count);
   const boxFill = topFills.find((f) => f.hex.toLowerCase() !== String(bgHex).toLowerCase()) || null;
+  const fillCss = (f) =>
+    f.alpha < 0.99
+      ? `rgba(${parseInt(f.hex.slice(1, 3), 16)}, ${parseInt(f.hex.slice(3, 5), 16)}, ${parseInt(f.hex.slice(5, 7), 16)}, ${+f.alpha.toFixed(2)})`
+      : f.hex;
   let surfaceSource = null;
   if (boxFill && boxFill.count >= 2) {
-    surface =
-      boxFill.alpha < 0.99
-        ? `rgba(${parseInt(boxFill.hex.slice(1, 3), 16)}, ${parseInt(boxFill.hex.slice(3, 5), 16)}, ${parseInt(boxFill.hex.slice(5, 7), 16)}, ${+boxFill.alpha.toFixed(2)})`
-        : boxFill.hex;
+    surface = fillCss(boxFill);
     surfaceSource = { fill: boxFill.hex, alpha: +boxFill.alpha.toFixed(2), shapes: boxFill.count };
   }
+  const fillVariants = topFills
+    .filter((f) => f.count >= 2 && f.hex.toLowerCase() !== String(bgHex).toLowerCase())
+    .slice(0, 3)
+    .map((f) => ({ css: fillCss(f), hex: f.hex, alpha: +f.alpha.toFixed(2), shapes: f.count, slides: [...f.slides].sort((a, b) => a - b).slice(0, 6) }));
 
   return {
     theme,
@@ -189,6 +198,7 @@ function pickColors(deck) {
     bg: bgHex,
     surface,
     surfaceSource,
+    fillVariants,
     ink,
     muted,
     darkBg,
@@ -250,10 +260,20 @@ function pickAssets(deck, mode) {
   // Key art by ROLE (computed automatically from geometry/usage/stats):
   // backgrounds and logos first, then decor, then icons and vector art.
   const roleScore = { background: 60, logo: 50, decor: 40, icon: 20, photo: 10, graphic: 10 };
+  // The slide-1 art is what a cover needs — a full-slide cover picture often is
+  // not flagged `usedAsBackground` (it is a placed image), so it used to lose
+  // the ranking and the copy lost its cover (real case).
+  const coverBg = new Set(
+    deck.slides.filter((s) => s.index === 1 && s.effectiveBg && s.effectiveBg.media).map((s) => s.effectiveBg.media),
+  );
+  const effBg = new Set(deck.slides.map((s) => s.effectiveBg && s.effectiveBg.media).filter(Boolean));
   const score = (m) => {
     let s = roleScore[m.role] || 0;
     if (m.kind === "vector") s += 40;
     if (m.usedAsBackground) s += 30;
+    if (effBg.has(m.name)) s += 40;
+    if (coverBg.has(m.name)) s += 80;
+    if ((m.usedBySlides || []).includes(1)) s += 30;
     if (m.usedBySlides.length) s += 25; // visible art beats layout-only art
     if (m.usedBySlides.length >= 2) s += 15;
     if (m.visual && m.visual.hasAlpha) s += 5;
@@ -264,11 +284,14 @@ function pickAssets(deck, mode) {
   const ranked = deck.media
     .filter((m) => m.usedBySlides.length || (m.usedByParts && m.usedByParts.length))
     .sort((a, b) => score(b) - score(a));
-  const cap = mode === "all" ? 64 : 8;
+  const cap = mode === "all" ? 64 : 20;
   if (mode === "all") return TOP(ranked, cap).filter((m) => !["emf", "wmf", "wdp"].includes(m.ext));
   // Key mode: quotas per role — a "style copy" without the template's logo,
   // decor or photo is not a copy (real incident: only backgrounds came out).
-  const quotas = { background: 4, logo: 1, decor: 2, photo: 1 };
+  // The decor/icon quota is deliberately wide: a template mixes many elements
+  // (banana + arrow + icons + photos), and one recycled decor on every slide
+  // is exactly what made a copy look generated (real case).
+  const quotas = { background: 4, logo: 1, decor: 7, photo: 2, icon: 4 };
   const out = [];
   const used = new Set();
   const take = (m) => {
@@ -316,22 +339,12 @@ async function extractAssets(deckFile, mediaList, dir) {
 function deployAssets(assetsDir, written, deckDir, deck, colors) {
   const images = path.join(deckDir, "images");
   fs.mkdirSync(images, { recursive: true });
-  const pick = (role, n = 1) => written.filter((a) => a.role === role).slice(0, n);
-  const bgs = pick("background", 4);
-  const logo = pick("logo", 1)[0];
-  // Decor: only art that is actually visible — placed on slides first; a
-  // layout-only decor is a hint (and orphan layouts must not be deployed at
-  // all: a real template kept colourful art in an unused layout). Take at most
-  // one decor per template slide so the deck gets a menu, not one slide's set.
-  const decorAll = written.filter((a) => a.role === "decor");
-  const decorOnSlides = decorAll.filter((a) => a.usedBySlides && a.usedBySlides.length);
-  const byFirstSlide = new Map();
-  for (const a of decorOnSlides) {
-    const key = a.usedBySlides[0];
-    if (!byFirstSlide.has(key)) byFirstSlide.set(key, a);
-  }
-  const decor = (decorOnSlides.length ? [...byFirstSlide.values()] : decorAll).slice(0, 5);
-  const lines = ["# Template assets — snippets and placement map", ""];
+  const infoByName = new Map(((deck && deck.media) || []).map((m) => [m.name, m]));
+  const roleOf = (name) => (infoByName.get(name) || {}).role || "graphic";
+  const dimsOf = (name) => {
+    const i = infoByName.get(name) || {};
+    return i.w && i.h ? `${i.w}×${i.h}px` : "size unknown";
+  };
 
   const walk = (els, out) => {
     for (const el of els || []) {
@@ -340,6 +353,16 @@ function deployAssets(assetsDir, written, deckDir, deck, colors) {
     }
     return out;
   };
+  const firstText = (els) => {
+    for (const el of els || []) {
+      if (el.text && el.text.plain && el.text.plain.trim()) return el.text.plain.trim().replace(/\s+/g, " ").slice(0, 40);
+      if (el.children) {
+        const t = firstText(el.children);
+        if (t) return t;
+      }
+    }
+    return "";
+  };
   const usage = (name) => {
     const rows = [];
     for (const s of (deck && deck.slides) || []) {
@@ -347,10 +370,17 @@ function deployAssets(assetsDir, written, deckDir, deck, colors) {
         if (el.media !== name) continue;
         const px = el.box && el.box.px;
         if (!px) continue;
-        rows.push({ slide: (s.index ?? rows.length) + 1, x: Math.round(px.x), y: Math.round(px.y), w: Math.round(px.w), h: Math.round(px.h) });
+        rows.push({
+          slide: s.index ?? rows.length + 1, // s.index is 1-based already
+          x: Math.round(px.x),
+          y: Math.round(px.y),
+          w: Math.round(px.w),
+          h: Math.round(px.h),
+          rot: px.rot ? Math.round(px.rot) : 0,
+        });
       }
     }
-    return rows;
+    return rows.sort((a, b) => a.slide - b.slide);
   };
   const layoutSlides = (name) => {
     const m = ((deck && deck.media) || []).find((x) => x.name === name);
@@ -358,26 +388,71 @@ function deployAssets(assetsDir, written, deckDir, deck, colors) {
     const parts = new Set(m.usedByParts.map((p) => p.replace("/_rels/", "/")));
     return ((deck && deck.slides) || [])
       .filter((s) => parts.has(s.layout) || parts.has(s.master))
-      .map((s) => (s.index ?? 0) + 1);
+      .map((s) => s.index);
   };
-  const bgSlides = (name) => ((deck && deck.slides) || []).filter((s) => s.effectiveBg && s.effectiveBg.media === name).map((s) => (s.index ?? 0) + 1);
-  const fmt = (rows, max = 4) =>
+  const bgSlides = (name) => ((deck && deck.slides) || []).filter((s) => s.effectiveBg && s.effectiveBg.media === name).map((s) => s.index);
+  const assetSlides = (m) => {
+    const eff = bgSlides(m.name);
+    return [...new Set(eff.concat(m.usedBySlides || []))].sort((a, b) => a - b);
+  };
+  const fmt = (rows, max = 6) =>
     rows
       .slice(0, max)
-      .map((r) => `slide ${r.slide}: left ${r.x}px, top ${r.y}px, ${r.w}×${r.h}px`)
+      .map((r) => `slide ${r.slide}: left ${r.x}px, top ${r.y}px, ${r.w}×${r.h}px${r.rot ? `, rot ${r.rot}°` : ""}`)
       .join("; ") + (rows.length > max ? `; … +${rows.length - max}` : "");
 
+  const pick = (role, n = 1) => written.filter((a) => a.role === role).slice(0, n);
+  // Cover art first, then the most-used backgrounds: the deck's first
+  // background should be the one the template uses on its cover.
+  const bgs = pick("background", 4)
+    .slice()
+    .sort((a, b) => (assetSlides(a).includes(1) ? 0 : 1) - (assetSlides(b).includes(1) ? 0 : 1) || b.usedBySlides.length - a.usedBySlides.length);
+  const logo = pick("logo", 1)[0];
+
+  // Decor vs branding: a near-white, wide lockup (e.g. БЛОК ТЕХНОЛОГИИ /
+  // #КОМАНДАСБЕРА) is brand art, not decoration. Treating it as decor put it
+  // on every slide, top-right, on top of the logo — two brandings overlapping.
+  const aspectOf = (a) => {
+    const i = infoByName.get(a.name) || {};
+    return i.w && i.h ? i.w / i.h : 1;
+  };
+  const isBranding = (a) => {
+    const i = infoByName.get(a.name) || {};
+    return a.role === "decor" && i.visual && i.visual.luminance > 0.9 && aspectOf(a) >= 2;
+  };
+  const decorArt = written.filter((a) => a.role === "decor");
+  const brandings = decorArt.filter(isBranding);
+  const decorsAll = decorArt.filter((a) => !isBranding(a));
+  // Keep the menu diverse but allow a stack (the template layers a blob and an
+  // arrow on one slide): at most two elements per template slide.
+  const perSlide = new Map();
+  const decors = [];
+  for (const a of decorsAll) {
+    if (decors.length >= 6) break;
+    const first = (a.usedBySlides && a.usedBySlides[0]) ?? "none";
+    const n = perSlide.get(first) || 0;
+    if (n >= 2) continue;
+    perSlide.set(first, n + 1);
+    decors.push(a);
+  }
+  const photos = written.filter((a) => a.role === "photo").slice(0, 2);
+  const icons = written.filter((a) => a.role === "icon").slice(0, 4);
+
+  const lines = ["# Template assets — snippets and placement map", ""];
+  const deployedName = new Map();
   const copyAs = (a, base) => {
     const out = base + path.extname(a.name);
     fs.copyFileSync(path.join(assetsDir, a.name), path.join(images, out));
+    deployedName.set(a.name, out);
     return out;
   };
 
   bgs.forEach((bg, bi) => {
     const n = copyAs(bg, bgs.length === 1 ? "template-bg" : `template-bg-${bi + 1}`);
-    const slides = bgSlides(bg.name);
+    const slides = assetSlides(bg);
+    const cover = slides.includes(1);
     lines.push(
-      `## Background${bgs.length === 1 ? "" : ` ${bi + 1}`}`,
+      `## Background${bgs.length === 1 ? "" : ` ${bi + 1}`}${cover ? " (cover)" : ""}`,
       "",
       slides.length
         ? `Used as the slide background on template slides: ${slides.join(", ")} — put a background on EVERY slide that has one in the template (content slides included, not only cover/closing)`
@@ -392,27 +467,51 @@ function deployAssets(assetsDir, written, deckDir, deck, colors) {
   if (logo) {
     const n = copyAs(logo, "template-logo");
     const rows = usage(logo.name);
+    const left = rows.length ? rows[0].x < 640 : false;
     lines.push(
       "## Logo",
       "",
-      rows.length ? `Placed on template slides: ${fmt(rows)}` : "",
+      rows.length ? `Placed on template slides: ${fmt(rows, 4)}` : "",
       "",
       "```html",
-      `<img class="logo" src="images/${n}" alt="Logo">`,
+      `<img class="logo${left ? " pos-tl" : ""}" src="images/${n}" alt="Logo">`,
       "```",
       "",
-      "Add `with-logo` to the slide class when it carries the logo — it reserves the top chrome band so text never collides with the logo.",
+      left
+        ? "The template keeps the logo in the TOP-LEFT — keep that corner (`pos-tl`) and do not put secondary art there."
+        : "Add `with-logo` to the slide class when it carries the logo — it reserves the top chrome band so text never collides with the logo.",
       "",
     );
   }
-  decor.forEach((a, i) => {
+  brandings.slice(0, 2).forEach((a, i) => {
+    const n = copyAs(a, `template-brand-${i + 1}`);
+    const rows = usage(a.name);
+    const viaLayout = rows.length ? [] : layoutSlides(a.name);
+    lines.push(
+      `## Branding lockup (${n}, ${dimsOf(a.name)})`,
+      "",
+      "Near-white branding artwork (logo + division name). The template places it "
+        + (rows.length ? `at ${fmt(rows, 3)}` : viaLayout.length ? `on slides ${viaLayout.slice(0, 4).join(", ")}` : "in a fixed corner")
+        + " — usually ONCE on the cover.",
+      "",
+      "It is NOT decor: do not repeat it on every slide and never place it over the logo — two brandings stacked is the classic failure.",
+      "",
+      "```html",
+      rows.length
+        ? `<img class="decor-img" style="left:${rows[0].x}px; top:${rows[0].y}px; width:${rows[0].w}px" src="images/${n}" alt="">`
+        : `<img class="decor-img pos-bl" src="images/${n}" alt="">`,
+      "```",
+      "",
+    );
+  });
+  decors.forEach((a, i) => {
     const n = copyAs(a, `template-decor-${i + 1}`);
     const rows = usage(a.name);
     const viaLayout = rows.length ? [] : layoutSlides(a.name);
-    const info = ((deck && deck.media) || []).find((x) => x.name === a.name);
-    const dims = info && info.w && info.h ? `${info.w}×${info.h}px` : "size unknown";
+    const info = infoByName.get(a.name) || {};
+    const light = info.visual && info.visual.luminance > 0.85;
     lines.push(
-      `## Decor ${i + 1} (${dims})`,
+      `## Decor ${i + 1} (${dimsOf(a.name)})`,
       "",
       rows.length
         ? `In the template it appears at: ${fmt(rows)} (reference only)`
@@ -420,7 +519,8 @@ function deployAssets(assetsDir, written, deckDir, deck, colors) {
           ? `From the slide layout — visible on template slides ${viaLayout.slice(0, 6).join(", ")}${viaLayout.length > 6 ? " …" : ""}`
           : "Placement in the template is unclear — it is an edge illustration.",
       "",
-      "Stage px (1280×720), 1:1 with this deck. These are HINTS from the template's own layout: you may move, resize, bleed or mirror the decor, swap in another deployed decor, or borrow a motif from another template slide. What matters is that the template's visual vocabulary is present and never collides with text.",
+      ...(light ? ["Near-white art: it only reads on a dark background — check the render if you put it on a light surface.", ""] : []),
+      "Stage px (1280×720), 1:1 with this deck. These are HINTS from the template's own layout: the template does NOT repeat decor at identical coordinates — it moves, mirrors, scales, bleeds it off an edge, or stacks two elements (a blob under an arrow). Do the same: if you reuse this element on several slides, move/resize/mirror it or pick another deployed decor.",
       "",
       "If your slide's text occupies this area, bleed the decor off an edge (negative left/top or right/bottom offsets), shrink it, or pick another decor — an image over text is a blocking TEXT-OVERLAP error.",
       "",
@@ -432,20 +532,111 @@ function deployAssets(assetsDir, written, deckDir, deck, colors) {
       "",
     );
   });
-  if (!bgs.length && !logo && !decor.length) {
+  photos.forEach((a, i) => {
+    const n = copyAs(a, `template-photo-${i + 1}`);
+    const rows = usage(a.name);
+    const square = rows.some((r) => r.w === r.h);
+    lines.push(
+      `## Photo ${i + 1} (${dimsOf(a.name)})`,
+      "",
+      rows.length ? `In the template: ${fmt(rows, 3)}` : "A photo used by the template.",
+      "",
+      "Use it where the layout calls for a picture — as positioned art (snippet below) or inside a `.media` block in a pattern (same file). One image = one meaning; never reuse one file on two slides.",
+      "",
+      "```html",
+      rows.length
+        ? `<img class="decor-img${square ? " round" : ""}" style="left:${rows[0].x}px; top:${rows[0].y}px; width:${rows[0].w}px" src="images/${n}" alt="">`
+        : `<img class="decor-img pos-br" src="images/${n}" alt="">`,
+      "```",
+      "",
+      square ? "The template crops this photo as a circle (`class=\"decor-img round\"`)." : "",
+      "",
+    );
+  });
+  icons.forEach((a, i) => {
+    const n = copyAs(a, `template-icon-${i + 1}`);
+    const rows = usage(a.name);
+    lines.push(
+      `## Icon ${i + 1} (${dimsOf(a.name)})`,
+      "",
+      rows.length ? `In the template: ${fmt(rows, 3)}` : "An icon used by the template.",
+      "",
+      "3D icon art — the template places 2–4 of them around a slide as accents. Use it instead of drawing your own shape; one icon per idea.",
+      "",
+      "```html",
+      rows.length
+        ? `<img class="decor-img" style="left:${rows[0].x}px; top:${rows[0].y}px; width:${rows[0].w}px" src="images/${n}" alt="">`
+        : `<img class="decor-img pos-tr" src="images/${n}" alt="">`,
+      "```",
+      "",
+    );
+  });
+  if (!bgs.length && !logo && !decorArt.length && !photos.length && !icons.length) {
     lines.push("_The template has no reusable background/logo/decor (a flat token-only style)._");
   }
-  if (colors && colors.surfaceSource) {
-    const src = colors.surfaceSource;
+  if (colors && colors.fillVariants && colors.fillVariants.length) {
+    lines.push("## Box styles (the template mixes them)", "");
+    for (const v of colors.fillVariants) {
+      lines.push(`- ${v.css} — ${v.shapes} box(es) on slides ${v.slides.join(", ") || "?"}`);
+    }
     lines.push(
-      "## Boxes",
       "",
-      `Content boxes in the template are painted with ${src.fill} at ${Math.round(src.alpha * 100)}% (${src.shapes} shapes). ` +
-        `The profile tokens already set --c-surface to it, so plain .card matches the original.`,
+      "The profile tokens expose these as `--c-surface` (main) and `--c-surface-2` (runner-up). Paste-ready classes:",
+      "- `.card` — the template's main surface;",
+      "- `.card.deep` — the runner-up fill (`--c-surface-2`);",
+      "- `.card.tint` — translucent accent (`--c-accent-soft`);",
+      "- `.card.ghost` — outline-only (transparent, keeps the border);",
+      "- `.card.inverse` — ink background / bg-colored text.",
       "",
-      "- content box = `.card` (uses the template's surface);",
-      "- accent highlight = `.card.tint` (translucent accent via --c-accent-soft);",
-      "- solid `.card.accent` — at most ONE short key message per slide, never a wall of green boxes.",
+      "Alternate them across slides the way the template does — the same box on every slide is what makes a copy look generated.",
+      "",
+    );
+  }
+  // Per-slide recipes: what the template actually composes, in deployed names.
+  const slideFills = (els, map) => {
+    for (const el of els || []) {
+      const f = el.fill;
+      if (f && f.type === "solid" && f.hex) {
+        const alpha = f.alpha === undefined ? 1 : f.alpha;
+        if (alpha >= 0.05) {
+          const key =
+            alpha < 0.99
+              ? `rgba(${parseInt(f.hex.slice(1, 3), 16)}, ${parseInt(f.hex.slice(3, 5), 16)}, ${parseInt(f.hex.slice(5, 7), 16)}, ${+alpha.toFixed(2)})`
+              : f.hex;
+          map.set(key, (map.get(key) || 0) + 1);
+        }
+      }
+      if (el.children) slideFills(el.children, map);
+    }
+  };
+  const recipes = [];
+  ((deck && deck.slides) || []).slice(0, 24).forEach((s, i) => {
+    const parts = [];
+    const bgMedia = s.effectiveBg && s.effectiveBg.media;
+    if (bgMedia) parts.push(`bg ${deployedName.get(bgMedia) || bgMedia}`);
+    const seen = new Set();
+    for (const el of walk(s.elements, [])) {
+      if (!el.media || el.media === bgMedia || roleOf(el.media) === "background" || seen.has(el.media)) continue;
+      seen.add(el.media);
+      const px = el.box && el.box.px;
+      parts.push(
+        `${deployedName.get(el.media) || el.media}[${roleOf(el.media)}] @${px ? Math.round(px.x) : "?"},${px ? Math.round(px.y) : "?"}` +
+          (px && px.rot ? ` rot${Math.round(px.rot)}°` : ""),
+      );
+    }
+    const fills = new Map();
+    slideFills(s.elements, fills);
+    if (fills.size) parts.push(`boxes: ${[...fills.entries()].map(([k, n]) => `${k}×${n}`).join(", ")}`);
+    const title = firstText(s.elements);
+    recipes.push(`- slide ${s.index ?? i + 1}${title ? ` («${title}»)` : ""}: ${parts.join("; ") || "empty"}`);
+  });
+  if (recipes.length) {
+    lines.push(
+      "## Layout recipes — how the template composes slides",
+      "",
+      "Look at the slide PNGs, then mirror the recipe with your own content (do not trace it 1:1). The variety is the point: a KPI row, a flow with connectors, a photo-led slide, a transition with one big element.",
+      "",
+      ...recipes,
       "",
     );
   }
@@ -453,13 +644,14 @@ function deployAssets(assetsDir, written, deckDir, deck, colors) {
     "## Checklist",
     "",
     "- background on the slides where the template shows one;",
-    "- logo in the same corner (add `with-logo` to those slides);",
-    "- **at least one template decor element** placed somewhere sensible (cover/closing/section edge);",
+    "- logo in the same corner (add `pos-tl`/`with-logo` as the map says);",
+    "- **at least one template decor element** placed somewhere sensible (cover/closing/section edge) — and not the same one at the same spot on every slide;",
+    "- photos/icons from the menu on the slides where the template uses them;",
     "- placement, size and the choice of decor are yours — adapt to the new content.",
     "",
   );
   fs.writeFileSync(path.join(images, "template-assets.md"), lines.join("\n"));
-  return { bg: bgs.length > 0, backgrounds: bgs.length, logo: !!logo, decor: decor.length, dir: images };
+  return { bg: bgs.length > 0, backgrounds: bgs.length, logo: !!logo, decor: decors.length, branding: brandings.length, photos: photos.length, icons: icons.length, dir: images };
 }
 
 function tokensCss(p, slug) {
@@ -471,6 +663,7 @@ function tokensCss(p, slug) {
   --slide-bg: ${p.bg};
   --c-bg: ${p.bg};
   --c-surface: ${p.surface};
+  --c-surface-2: ${p.fillVariants && p.fillVariants[1] ? p.fillVariants[1].css : p.surface};
   --c-ink: ${p.ink};
   --c-muted: ${p.muted};
   --c-accent: ${p.accent};
@@ -637,4 +830,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { slugify };
+module.exports = { slugify, deployAssets };

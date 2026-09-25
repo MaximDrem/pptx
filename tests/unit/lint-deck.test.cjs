@@ -163,4 +163,25 @@ assert.ok(bypass.errors.length > 0, "GIGATOOL_DECK_LINT=0 must not disable lint 
   assert.ok(!errs.includes("support@example.com"), "a plain-text email is allowed offline");
 }
 
+// Raw block tags inside a pattern box break the export shape merge — hard error.
+{
+  const cardDeck = path.join(dir, "raw-card.deck.html");
+  fs.writeFileSync(
+    cardDeck,
+    `<!doctype html><html><head><style>.slide { color: red; }</style></head><body>
+<div class="deck-viewport"><div class="deck-stage" id="deck-stage">
+<section class="slide" data-role="content"><div class="slide-pad">
+  <div class="headline">Т</div>
+  <div class="content"><div class="card"><h3>Заголовок</h3><p>Текст</p></div></div>
+  <div class="footer"><span>1</span></div>
+</div></section>
+</div></div></body></html>`,
+  );
+  const res = lintDeck(cardDeck, { quiet: true });
+  assert.ok(res.errors.join("\n").includes("raw <h3> inside .card"), "raw tags inside a box must be an error");
+  fs.writeFileSync(cardDeck, fs.readFileSync(cardDeck, "utf8").replace("<h3>Заголовок</h3><p>Текст</p>", '<span class="t-title">Заголовок</span><br><span class="t-body">Текст</span>'));
+  const clean = lintDeck(cardDeck, { quiet: true });
+  assert.ok(!clean.errors.join("\n").includes("raw <"), "runs inside a box stay clean");
+}
+
 console.log("PASS  lint-deck: //host и file: ловятся, bypass удалён, шаблонные ассеты обязательны");

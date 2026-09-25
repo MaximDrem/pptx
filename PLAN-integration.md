@@ -13,7 +13,7 @@ BrowserWindow, which already exists in production for `--pptx-verify`.
 | From (this repository) | To (desktop-ai-app) |
 |---|---|
 | `presentation_v3/*` | `packages/desktop-electron/resources/defaults/skills/presentation/` (delete the folder and replace it entirely) |
-| `presentation_v3/.bundle-version` (= 54) | already inside the folder above |
+| `presentation_v3/.bundle-version` (= 55) | already inside the folder above |
 | `presentation_v3/app/deck-render.ts` | `src/main/deck-render.ts` |
 | the detector from `deck-render.ts` (`isRunDeckRender`) | `src/main/deck-render-check.ts` (mirroring `pptx-verify-check.ts`) |
 
@@ -24,7 +24,7 @@ cp -r /path/to/presentation_v3 packages/desktop-electron/resources/defaults/skil
 git add packages/desktop-electron/resources/defaults/skills/presentation
 ```
 
-Verify `.bundle-version` = `54` (the currently installed one = 35; when the
+Verify `.bundle-version` = `55` (the currently installed one = 35; when the
 number increases, `seed-defaults.ts` deletes the user's folder and re-seeds it
 entirely — the old skill rolls out by itself).
 
@@ -96,7 +96,7 @@ as in `--pptx-verify`.
 
 `presentation` is already in `versionStampedSkills` (the line exists in the
 current version) — no code change is needed, only the new
-`.bundle-version = 54`. If the line is actually missing, add it following the
+`.bundle-version = 55`. If the line is actually missing, add it following the
 neighboring skills.
 
 ### 2.5 Packaging
@@ -180,3 +180,16 @@ No app change is required; the emitted report shape is backwards compatible
 placement — stay with the model's visual self-review (SKILL §6), not with
 lint gates: functional checks remain limited to objectively visible defects
 (clip/overlap/blank/broken).
+
+## 9. v55 addition: richer template extraction + editing guards (no app change)
+
+`style-profile.cjs` key mode now deploys up to 20 assets (bg 4, decor 6,
+photo 2, icon 4, logo, branding) instead of 8. The slide-1 background is ranked
+first and labelled `(cover)`; near-white wide lockups are classified as
+**branding** (not decor) so they are not pasted over the logo on every slide;
+`template-assets.md` gains placements with rotation, Photo/Icon/Branding
+sections, Box styles (runner-up fill → `--c-surface-2` + `.card.deep`) and a
+per-slide `Layout recipes` map; placement slide numbers are 1-based (they used
+to be off by one). `lint-deck.cjs` errors on raw `<h3>/<p>/<ul>` inside pattern
+boxes (one-box rule), so a fallback to raw HTML inside `.card` is caught as a
+static error. Report/inventory shapes are untouched; no app change.

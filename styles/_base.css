@@ -112,6 +112,7 @@
 .card.inverse h3, .card.inverse p, .card.inverse .card-cap { color: var(--c-bg); }
 .card.accent h3, .card.accent p, .card.accent .card-cap, .card.accent .list li { color: var(--c-on-accent); }
 .card.ghost { background: transparent; }
+.card.deep { background: var(--c-surface-2, var(--c-surface)); }
 
 .card h3 { font-family: var(--f-body); font-size: 17px; font-weight: 600; margin: 0; color: var(--c-ink); }
 .card p { font-size: 14.5px; line-height: 1.45; color: var(--c-muted); margin: 0; }
@@ -370,6 +371,7 @@
 .logo.pos-tl { left: 72px; right: auto; }
 .logo.lg { height: 42px; }
 .decor-img { position: absolute; pointer-events: none; }
+.decor-img.round { border-radius: 50%; }
 .decor-img.pos-br { bottom: -60px; right: -40px; }
 .slide.with-logo .slide-pad { padding-top: 104px; }
 
