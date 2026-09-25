@@ -23,6 +23,14 @@ const argv = process.argv.slice(2);
 const flag = (n) => argv[argv.indexOf(n) + 1];
 const deck = argv[argv.indexOf("--deck-render") + 1];
 const out = flag("--out-dir");
+if (process.env.STUB_CRASH_ONCE === "1") {
+  const marker = process.env.STUB_CRASH_MARKER;
+  if (marker && !fs.existsSync(marker)) {
+    fs.writeFileSync(marker, "crashed");
+    console.error("Error: Object has been destroyed");
+    process.exit(3);
+  }
+}
 fs.mkdirSync(out, { recursive: true });
 fs.writeFileSync(path.join(out, "report.json"), JSON.stringify({
   file: deck,
@@ -136,6 +144,18 @@ async function main() {
   assert.ok(!fs.readFileSync(srcDeck, "utf8").includes("data:image"), "authored deck.html must stay free of data URIs");
   assert.ok(fs.readFileSync(srcDeck, "utf8").includes('src="images/px.png"'), "relative refs stay in the source");
   assert.strictEqual(fs.readFileSync(path.join(out6, "saw-image.txt"), "utf8"), "yes", "the build copy must carry referenced images");
+
+  // 7. A renderer crash (Electron "Object has been destroyed") is retried once.
+  process.env.STUB_CRASH_ONCE = "1";
+  const crashMarker = path.join(dir, "crash.marker");
+  process.env.STUB_CRASH_MARKER = crashMarker;
+  const crashDeck = path.join(dir, "crash.deck.html");
+  fs.writeFileSync(crashDeck, "<!doctype html><html><body></body></html>");
+  const r7 = await renderDeck(crashDeck, { outDir: path.join(dir, "crash-out") });
+  delete process.env.STUB_CRASH_ONCE;
+  delete process.env.STUB_CRASH_MARKER;
+  assert.strictEqual(r7.code, 0, "the retry must succeed after one crash");
+  assert.ok(fs.existsSync(crashMarker), "the first attempt must have crashed");
 
   console.log("PASS  render: отчёт переживает очистку temp, артефакты кладутся рядом с deck.html");
 }

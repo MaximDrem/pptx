@@ -148,9 +148,6 @@ function renderDeck(deckPath, opts = {}) {
   if (opts.noPng) args.push("--no-png");
 
   return new Promise((resolve) => {
-    let child;
-    let timedOut = false;
-    let timer = null;
     const cleanup = () => {
       try {
         fs.rmSync(buildDir, { recursive: true, force: true });
@@ -162,39 +159,64 @@ function renderDeck(deckPath, opts = {}) {
         // best-effort cleanup
       }
     };
-    try {
-      child = spawn(binary, args, { env, stdio: ["ignore", "inherit", "inherit"] });
-    } catch (e) {
+    const finish = (result) => {
       cleanup();
-      resolve({ ran: false, code: null, reason: `failed to launch renderer: ${e && e.message}`, outDir });
-      return;
-    }
-    timer = setTimeout(() => {
-      timedOut = true;
+      resolve(result);
+    };
+
+    // One renderer crash (Electron "Object has been destroyed" — observed in a
+    // real run) is retried once: it is transient, and the model otherwise gets
+    // an opaque failure and starts guessing (disk space, app restart…).
+    const runOnce = (attemptNo) => {
+      let child;
+      let timedOut = false;
+      let timer = null;
+      let stderrTail = "";
       try {
-        child.kill("SIGKILL");
-      } catch {
-        // already gone
-      }
-    }, timeoutMs);
-    child.on("error", (e) => {
-      if (timer) clearTimeout(timer);
-      cleanup();
-      resolve({ ran: false, code: null, reason: `failed to launch renderer: ${e && e.message}`, outDir });
-    });
-    child.on("exit", async (code, signal) => {
-      if (timer) clearTimeout(timer);
-      if (timedOut) {
-        cleanup();
-        resolve({ ran: true, code: 3, reason: `render timed out after ${Math.round(timeoutMs / 1000)}s`, outDir, kept: keep });
+        child = spawn(binary, args, { env, stdio: ["ignore", "pipe", "pipe"] });
+      } catch (e) {
+        finish({ ran: false, code: null, reason: `failed to launch renderer: ${e && e.message}`, outDir });
         return;
       }
-      if (signal) {
-        cleanup();
-        resolve({ ran: false, code: null, reason: `renderer killed by ${signal}`, outDir });
-        return;
-      }
-      const finalCode = code ?? 3;
+      child.stdout.on("data", (d) => process.stdout.write(d));
+      child.stderr.on("data", (d) => {
+        const txt = d.toString();
+        stderrTail = (stderrTail + txt).slice(-4000);
+        process.stderr.write(d);
+      });
+      timer = setTimeout(() => {
+        timedOut = true;
+        try {
+          child.kill("SIGKILL");
+        } catch {
+          // already gone
+        }
+      }, timeoutMs);
+      child.on("error", (e) => {
+        if (timer) clearTimeout(timer);
+        finish({ ran: false, code: null, reason: `failed to launch renderer: ${e && e.message}`, outDir });
+      });
+      child.on("exit", async (code, signal) => {
+        if (timer) clearTimeout(timer);
+        if (timedOut) {
+          finish({ ran: true, code: 3, reason: `render timed out after ${Math.round(timeoutMs / 1000)}s`, outDir, kept: keep });
+          return;
+        }
+        if (signal) {
+          finish({ ran: false, code: null, reason: `renderer killed by ${signal}`, outDir });
+          return;
+        }
+        const finalCode = code ?? 3;
+        const crashed = finalCode === 3 && !fs.existsSync(path.join(outDir, "report.json"));
+        if (crashed && attemptNo === 1) {
+          if (/has been destroyed|Render process gone|Target closed/i.test(stderrTail)) {
+            console.error("render: the app window was destroyed (Electron crash) — this is transient, retrying once");
+          } else {
+            console.error("render: the renderer crashed before writing a report — retrying once");
+          }
+          runOnce(2);
+          return;
+        }
       let post = null;
       let artifacts = [];
       // Parse the reports before the temp dir is removed: the HTML-level probe
@@ -248,9 +270,10 @@ function renderDeck(deckPath, opts = {}) {
           console.error("artifact copy failed: " + (e.message || e));
         }
       }
-      cleanup();
-      resolve({ ran: true, code: effectiveCode, outDir, kept: keep, post, report, inventory, artifacts, reason: effectiveCode !== finalCode ? "blocking layout issues — export skipped" : undefined });
-    });
+      finish({ ran: true, code: effectiveCode, outDir, kept: keep, post, report, inventory, artifacts, reason: effectiveCode !== finalCode ? "blocking layout issues — export skipped" : undefined });
+      });
+    };
+    runOnce(1);
   });
 }
 

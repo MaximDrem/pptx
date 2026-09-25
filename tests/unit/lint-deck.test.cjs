@@ -141,4 +141,26 @@ assert.ok(bypass.errors.length > 0, "GIGATOOL_DECK_LINT=0 must not disable lint 
   assert.ok(res.errors.join("\n").includes("unbalanced <section>"), "unclosed section must be an error");
 }
 
+// Raw HTML slides (no patterns) and URLs get precise errors; emails are fine.
+{
+  const rawDeck = path.join(dir, "raw.deck.html");
+  fs.writeFileSync(
+    rawDeck,
+    `<!doctype html><html><head><style>.slide { color: red; }</style></head><body>
+<div class="deck-viewport"><div class="deck-stage" id="deck-stage">
+<section class="slide" data-role="content"><div class="slide-pad">
+  <h2>Сырой заголовок</h2><p>Просто текст и <a href="http://example.com">ссылка</a>.</p>
+  <ul><li>пункт</li></ul><p>Почта support@example.com — это нормально.</p>
+</div></section>
+</div></div></body></html>`,
+  );
+  const res = lintDeck(rawDeck, { quiet: true });
+  const errs = res.errors.join("\n");
+  assert.ok(errs.includes("no .headline"), "raw <h2> must be reported");
+  assert.ok(errs.includes('no <div class="content">'), "missing content wrapper must be reported");
+  assert.ok(errs.includes("no block from patterns.md"), "raw paragraphs must be reported");
+  assert.ok(errs.includes("external URL on slide 1: http://example.com"), "the URL error must name the slide");
+  assert.ok(!errs.includes("support@example.com"), "a plain-text email is allowed offline");
+}
+
 console.log("PASS  lint-deck: //host и file: ловятся, bypass удалён, шаблонные ассеты обязательны");

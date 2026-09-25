@@ -120,7 +120,14 @@ function lintDeck(deckPath, opts = {}) {
     if (/^https?:\/\/www\.w3\.org\//.test(m[1])) continue; // xmlns
     external.add(m[1]);
   }
-  for (const url of external) errors.push("external URL (the deck must work offline): " + url);
+  for (const url of external) {
+    const at = raw.indexOf(url);
+    const onSlide = at === -1 ? null : (raw.slice(0, at).match(/<section\b/gi) || []).length;
+    errors.push(
+      `external URL${onSlide ? ` on slide ${onSlide}` : ""}: ${url} — the deck is offline: replace it with plain text ` +
+        `(contacts are text, not links; an email address as plain text is fine)`,
+    );
+  }
 
   // 2. Session tools are chat-turn only.
   const toolRe = new RegExp(SESSION_TOOL_RE.source, "g");
@@ -168,6 +175,33 @@ function lintDeck(deckPath, opts = {}) {
   }
   for (const tag of slideTags) {
     if (!/\bdata-role=/.test(tag)) warnings.push("slide without data-role (cover|section|content|quote|closing) — layout checks get weaker: " + tag.slice(0, 80));
+  }
+  // Pattern discipline: raw <h2>/<p>/<ul> is not a slide. Without the pattern
+  // blocks the deck collapses into sparse text pages (no accents, empty
+  // regions, mostly-empty errors) — this was a real failed run.
+  const PATTERN_BLOCK = /class=(["'])[^"']*\b(card|kpi-row|grid2|grid3|grid4|split|flow|timeline|table|steps|donut|matrix|funnel|list|quote|content)\b/;
+  const sectionRe = /<section\b([^>]*)>([\s\S]*?)<\/section>/gi;
+  let sec;
+  let secIndex = 0;
+  while ((sec = sectionRe.exec(raw))) {
+    secIndex++;
+    const role = (/(?:^|\s)data-role=(["'])([^"']+)\1/.exec(sec[1]) || [])[2] || "content";
+    if (role !== "content") continue;
+    const body = sec[2];
+    if (!/class=(["'])[^"']*\bheadline\b/.test(body)) {
+      errors.push(`slide ${secIndex}: no .headline — content slides use the heading pattern (.kicker + .headline), not a raw <h2>`);
+    }
+    if (!/<div[^>]*class=(["'])[^"']*\bcontent\b/.test(body)) {
+      errors.push(`slide ${secIndex}: no <div class="content"> — blocks live inside the content wrapper`);
+    }
+    if (!PATTERN_BLOCK.test(body)) {
+      errors.push(
+        `slide ${secIndex}: no block from patterns.md (card/kpi-row/grid/split/flow/timeline/table/steps/donut/matrix/list) — raw <p>/<ul> is not a pattern; take the markup from patterns.md`,
+      );
+    }
+    if (!/class=(["'])[^"']*\bfooter\b/.test(body)) {
+      warnings.push(`slide ${secIndex}: no .footer — the numbering/anchor is lost (add <div class="footer">…</div>)`);
+    }
   }
   if (!/deck-stage/.test(raw) || !/deck-viewport/.test(raw)) {
     warnings.push("stage markers (.deck-stage/.deck-viewport) not found — paste stage.css into the <style> block");

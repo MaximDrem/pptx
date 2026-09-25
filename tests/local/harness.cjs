@@ -85,6 +85,22 @@ window.__runExport = async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "presentation-v2-harness-"));
   const file = path.join(dir, "wrapper.html");
   fs.writeFileSync(file, wrapper);
+  // Relative refs (images/…, fonts/…) must travel with the wrapper — otherwise
+  // every local asset reports BROKEN-IMAGE and the diagnosis lies.
+  try {
+    const { collectRefs, isData, isExternal, resolveRef } = require(path.join(SKILL, "helpers", "refs.cjs"));
+    const deckDir = path.dirname(path.resolve(deckPath));
+    for (const { ref } of collectRefs(wrapper)) {
+      if (isData(ref) || isExternal(ref)) continue;
+      const { found } = resolveRef(deckDir, ref);
+      if (!found) continue;
+      const dest = path.join(dir, ref);
+      fs.mkdirSync(path.dirname(dest), { recursive: true });
+      fs.copyFileSync(found, dest);
+    }
+  } catch {
+    // best-effort: tests still run, assets may be missing
+  }
   return { dir, file };
 }
 

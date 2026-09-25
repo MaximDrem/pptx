@@ -263,7 +263,12 @@ rewrites the complete file.
 Markup rules:
 
 - slides and blocks come from `patterns.md`; do not invent a new grid until you
-  have tried the existing ones;
+  have tried the existing ones. **Raw `<h2>/<p>/<ul>` pages are not slides**:
+  a content slide must have `.headline` (in `.slide-head`), a `<div
+  class="content">` wrapper and at least one pattern block
+  (`.card`, `.kpi-row`, `.grid2/3/4`, `.split`, `.flow`, `.timeline`, `.table`,
+  `.steps`, `.donut`, `.matrix`, `.list`). `lint-deck` fails raw-HTML slides —
+  they are what produce "no accents / empty regions / mostly empty" decks;
 - **one-box rule**: text inside a colored box is written as runs directly in
   the box (`.t-title/.t-body/.t-cap`, `<b>`, `<br>`) with nothing else in the
   box; icons/badges go next to it via `.card-stack`. **Separate every row
@@ -306,7 +311,10 @@ Markup rules:
   single-file HTML is explicitly asked for). **One image = one meaning**: never place the same file on two slides (probe flags
   `image-reuse`), and a photo must fill a real block — a full-size picture
   squeezed into a small tile reads as an accident (probe flags `tiny-image`);
-- no external links/fonts/scripts (except our navigator);
+- no external links/fonts/scripts (except our navigator); contacts are PLAIN
+  TEXT — no `http(s)://` URLs, no links: the deck is offline. An email
+  address written as text is fine. `lint-deck` names the slide for every
+  URL it finds;
 - write 8–14 slides in one pass; more — in two passes.
 
 ### 4. Render loop (mandatory gate)
@@ -338,7 +346,11 @@ to edit):
 - `TEXT-CLIP` / `TEXT-OVERLAP`: replace fixed heights / absolute positioning
   with a pattern;
 - `MISSING-BR`: add `<br>` between the rows inside the box;
-- `MOSTLY-EMPTY`: add a block or switch the pattern.
+- `MOSTLY-EMPTY`: add a block or switch the pattern (decor does not count as
+  content);
+- `render: the app window was destroyed` — Electron crashed; the helper
+  retries once automatically. If it repeats, tell the user the app session is
+  broken instead of guessing about disk space.
 
 If the same fix touches several slides (identical anchors), rewrite the whole
 file — do not try N identical edits.
