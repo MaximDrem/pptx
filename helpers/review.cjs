@@ -51,6 +51,27 @@ async function main() {
   const deck = path.resolve(deckArg);
   const outDir = path.resolve(flag("--out-dir") || fs.mkdtempSync(path.join(os.tmpdir(), "deck-review-")));
 
+  // Cheap preflight BEFORE the browser: catch missing/misnamed local files
+  // (a typo like images/template-bbg-1.png used to surface only as a
+  // BROKEN-IMAGE deep in the render loop).
+  try {
+    const { collectRefs, isData, isExternal, resolveRef } = require("./refs.cjs");
+    const missing = [];
+    for (const { ref } of collectRefs(fs.readFileSync(deck, "utf8"))) {
+      if (isData(ref) || isExternal(ref)) continue;
+      const { found } = resolveRef(path.dirname(deck), ref);
+      if (!found) missing.push(ref);
+    }
+    if (missing.length) {
+      console.error("=== MISSING FILES (fix these paths first) ===");
+      for (const m of missing) console.error("  " + m);
+      console.error("the file must exist next to the deck (images/…); check the spelling — do not rename paths to ./images, both forms are equivalent");
+      process.exit(1);
+    }
+  } catch {
+    // preflight is best-effort; the render still runs
+  }
+
   const r = await renderDeck(deck, { outDir });
   if (!r.ran) {
     console.error("review: render failed: " + r.reason);

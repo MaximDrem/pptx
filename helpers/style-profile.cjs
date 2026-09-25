@@ -409,8 +409,10 @@ function deployAssets(assetsDir, written, deckDir, deck, colors) {
     const n = copyAs(a, `template-decor-${i + 1}`);
     const rows = usage(a.name);
     const viaLayout = rows.length ? [] : layoutSlides(a.name);
+    const info = ((deck && deck.media) || []).find((x) => x.name === a.name);
+    const dims = info && info.w && info.h ? `${info.w}×${info.h}px` : "size unknown";
     lines.push(
-      `## Decor ${i + 1}`,
+      `## Decor ${i + 1} (${dims})`,
       "",
       rows.length
         ? `In the template it appears at: ${fmt(rows)} (reference only)`
@@ -419,6 +421,8 @@ function deployAssets(assetsDir, written, deckDir, deck, colors) {
           : "Placement in the template is unclear — it is an edge illustration.",
       "",
       "Stage px (1280×720), 1:1 with this deck. These are HINTS from the template's own layout: you may move, resize, bleed or mirror the decor, swap in another deployed decor, or borrow a motif from another template slide. What matters is that the template's visual vocabulary is present and never collides with text.",
+      "",
+      "If your slide's text occupies this area, bleed the decor off an edge (negative left/top or right/bottom offsets), shrink it, or pick another decor — an image over text is a blocking TEXT-OVERLAP error.",
       "",
       "```html",
       rows.length

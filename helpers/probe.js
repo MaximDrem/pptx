@@ -522,7 +522,12 @@
         if (ix <= 0 || iy <= 0) continue;
         const minArea = Math.min(t.rect.width * t.rect.height, rect.width * rect.height);
         if (minArea > 0 && (ix * iy) / minArea > 0.25) {
-          push("text-overlap", `a ${Math.round(rect.width)}×${Math.round(rect.height)}px graphic collides with text ` + excerpt(t.el, 40));
+          push(
+            "text-overlap",
+            `a ${Math.round(rect.width)}×${Math.round(rect.height)}px graphic collides with text ` +
+              excerpt(t.el, 40) +
+              " — move the decor to bleed off an edge (e.g. right:-90px; top:-120px), shrink it, or use a smaller decor; text must stay readable",
+          );
           break;
         }
       }
@@ -723,7 +728,7 @@
         // A heading plus one small block on an empty canvas is the real
         // "много пустого места" defect: measure how much of the band the
         // content actually covers (kicker/headline count, footer excluded).
-        push("mostly-empty", "the slide is mostly empty — content covers less than a quarter of the canvas; add substance or switch the pattern");
+        push("mostly-empty", "the slide is mostly empty — content covers less than a quarter of the canvas; ADD TEXT/BLOCKS/CHART (decor does not count as content) or switch the pattern");
       } else if (emptyTop > emptyLimit && emptyTop > emptyBottom * 1.5) {
         push("empty-region", `top ${Math.round(emptyTop * 100)}% of the content band is empty — did the heading get lost?`);
       } else if (emptyBottom > emptyLimit && emptyBottom > emptyTop * 1.5) {

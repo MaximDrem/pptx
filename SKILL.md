@@ -167,8 +167,11 @@ Then, **in this order**:
      mandate: move, resize, mirror or bleed the decor, swap in another
      deployed decor, or borrow a motif from another template slide — as long
      as (a) at least one template decor element is used and (b) decor never
-     collides with text (the probe errors on overlap) and never becomes a
-     full-slide background.
+     collides with text (probe errors on overlap: bleed it off an edge with
+     negative offsets, shrink it, or pick another decor) and never becomes a
+     full-slide background. Do not place the same large decor on every slide —
+     it will fight the content; cover-art + one decor on cover/closing is
+     usually enough.
    If `template-assets.md` says the template has no reusable art (a flat
    token-only style), say so and move on.
 5. Build the deck with `data-presentation-style="profile:<slug>"`. Keep the
