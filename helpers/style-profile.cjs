@@ -897,6 +897,8 @@ async function main() {
   if (deployDir) {
     const r = deployAssets(path.join(dir, "assets"), assets, path.resolve(deployDir), deck, colors);
     console.log(`deploy: bg=${r.backgrounds} logo=${r.logo ? "yes" : "no"} decor=${r.decor} → ${r.dir}`);
+    console.log(`deploy dir (absolute): ${r.dir} — write deck.html in THIS folder, next to its images/`);
+    console.log("deploy: verify with ls of that images/ — if your deck.html lives in another folder, re-run with --deploy <that folder>");
     console.log("deploy: paste the snippets from images/template-assets.md (bg-img / logo / decor-img); the deck MUST use at least one of them");
   }
   console.log("use: paste tokens.css before styles/_base.css; read profile.json for principles and evidence");

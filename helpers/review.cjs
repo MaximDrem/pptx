@@ -78,12 +78,9 @@ async function main() {
       console.error("=== MISSING FILES (fix these paths first) ===");
       for (const m of missing) console.error("  " + m);
       const deckDir = path.dirname(path.resolve(deck));
-      const cwd = process.cwd();
-      if (deckDir !== cwd) {
-        console.error(`the deck lives in ${deckDir}, but you are working in ${cwd} — save/move the deck into the working folder (the user sees files there) and keep images/ next to it`);
-      } else {
-        console.error("the file must exist next to the deck (images/…); check the spelling — do not rename paths to ./images, both forms are equivalent");
-      }
+      console.error(`the deck is ${path.resolve(deck)} — its files must exist under ${deckDir}/images/`);
+      console.error(`if the assets are elsewhere, redeploy them INTO the deck's folder: style-profile.cjs <template.pptx> --name "…" --deploy "${deckDir}"`);
+      console.error("do not move the deck to the files, do not copy folders to temp — the deck stays where it is");
       process.exit(1);
     }
   } catch {

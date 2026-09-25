@@ -87,18 +87,16 @@ function lintDeck(deckPath, opts = {}) {
   const html = stripComments(raw);
   const deckDir = path.dirname(file);
 
-  // 0. Location contract: the deck lives in the user's working folder, never in
-  //    temp (drafts/extracted media may go to temp, the result must not).
+  // 0. Location contract: the deck lives in the session's working folder (the
+  //    one pwd shows at start), never in temp (drafts/extracted media may go
+  //    to temp, the result must not). The helper's own cwd is not the
+  //    authority — the artifacts land next to the deck anyway.
   const abs = path.resolve(file);
   const tmp = os.tmpdir();
   if (abs.startsWith(tmp + path.sep)) {
     errors.push(
       `the deck is inside a temp directory (${tmp}): the user will not see the result. ` +
-        `Build deck.html in the current working folder (${process.cwd()})`,
-    );
-  } else if (!abs.startsWith(path.resolve(process.cwd()) + path.sep)) {
-    warnings.push(
-      `the deck is outside the current working folder (${process.cwd()}) — the user expects the files there (deck: ${abs})`,
+        `Write deck.html in the working folder (the chat's workspace) and keep images/ next to it`,
     );
   }
 

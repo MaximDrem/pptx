@@ -13,11 +13,13 @@ HTML and rebuild the .pptx.
 
 Each of these has already broken a real deck. They are not style advice.
 
-0. **Always answer in Russian.** No flexibility here: the whole answer, the
-   plan, the final summary and any question are in Russian, whatever language
-   this skill, the tool output or the model runs in. Slides are Russian too.
-   Never switch to English (a real run delivered a finished deck with an
-   English summary).
+0. **User-facing text is Russian; thinking stays English.** The reply to the
+   user, the visible plan, the final summary and any question are in Russian.
+   Your internal reasoning between tool calls may be English — that is the
+   platform default (think in English, talk to the user in Russian); do not
+   translate it and do not let it leak into the answer. Slides are Russian
+   too. A real run delivered a finished deck with an English summary — that
+   is the failure this rule prevents.
 
 1. **Only `helpers/index.cjs` builds the .pptx.**
    There is no python, no node, no npm and no network in this environment;
@@ -123,8 +125,18 @@ is not writing them:
 ## Command (the only allowed runtime)
 
 ```bash
-ELECTRON_RUN_AS_NODE=1 "$GIGATOOL_NODE" "$HOME/.wsc/config/skills/presentation/helpers/index.cjs" deck.html --pptx
+cd "<the chat's working folder>" && ELECTRON_RUN_AS_NODE=1 "$GIGATOOL_NODE" "$HOME/.wsc/config/skills/presentation/helpers/index.cjs" deck.html --pptx
 ```
+
+Every command runs in the working folder the session starts in — you know it
+from `pwd` at start, and it is where the user expects the files. Write
+`deck.html` and `images/` there; the deck never lives in `/tmp` (drafts,
+shots and extracted media may). Prefix helper calls with
+`cd "<working folder>" &&` so a drifted shell cannot send files elsewhere,
+and when a helper prints an absolute folder (deploy dir, artifact paths),
+read it — if it is not your working folder, re-run with an explicit path.
+After a style-profile `--deploy`, verify with `ls images/` before writing
+deck.html.
 
 All helpers run the same way (`ELECTRON_RUN_AS_NODE=1 "$GIGATOOL_NODE" …
 helpers/<name>.cjs …`). There is no bare `node` and no `python` — do not even
@@ -177,8 +189,15 @@ a decorative cat stretched as a background. The workflow:
 ... shots.cjs "<attached.pptx>" --out-dir /tmp/tpl-shots --keep
 
 # 2) Extract tokens + assets AND deploy the key art next to the deck
+#    (--deploy takes the working folder; "." only works with the cd above)
 ... style-profile.cjs "<attached.pptx>" --name "Style name" --deploy .
 ```
+
+Right after step 2, **verify the deploy landed in YOUR working folder** —
+the helper prints the absolute deploy dir; if it is not the folder you are
+working in, re-run with `--deploy "<your working folder>"`. A quick
+`ls images/` must show template-bg-*.png and template-assets.md before you
+write deck.html.
 
 Then, **in this order**:
 
@@ -407,10 +426,14 @@ Markup rules:
 - **vary the layout**: alternate patterns across slides (grid → split →
   kpi-row → timeline → picture). Three or more content slides with the same box
   grid read as "generated, not designed" — check this by eye in step 6;
-- **pictures**: 1–3 images generated with the chat image tool (e.g.
-  `gigachat_image`/`text2image`) on the cover or a key content slide are often
-  what a text-heavy deck is missing; place them per `patterns.md` (`.media`,
-  `.split`) and never reuse one file twice;
+- **pictures**: a deck made from scratch (5+ slides) MUST carry at least one
+  generated picture — the cover or a key content slide. Generate it with the
+  chat image tool (e.g. `gigachat_image`/`text2image`), SAVE the file into
+  `images/`, and reference the local path (`src="images/<file>"`) inside the
+  deck — never the tool call itself, never an external URL (the deck is
+  offline; the lint error on a `gigachat_image(` call in deck.html means
+  exactly this: file, not call). Place per `patterns.md` (`.media`, `.split`)
+  and never reuse one file twice;
 - **box fill**: do not leave tall boxes half-empty (probe warns `sparse-box`);
 - colors/fonts/radii only via tokens `var(--…)`; hex in markup is forbidden;
 - charts — from `charts.md` (SVG/CSS, no libraries), numbers must be honest;
@@ -472,7 +495,11 @@ to the user to edit):
 
 - `BROKEN-IMAGE` (error): the file is missing or misnamed — copy it next to
   the deck (`images/…`); `./images/x` and `images/x` are the same thing, do
-  not "fix" paths; fix ALL slides with that file at once;
+  not "fix" paths; fix ALL slides with that file at once. If the whole
+  `images/` set is gone, the deploy landed in another folder — re-run
+  `style-profile.cjs <template.pptx> --deploy "<the deck's folder>"`. Never
+  ask the user for template art you can extract yourself, and never copy the
+  workspace to temp to "fix permissions";
 - `TEXT-CLIP` (error): replace fixed heights / absolute positioning with a
   pattern — text must never be cut off;
 - `LOW-CONTRAST` (suggestion): body text uses `.t-body`/`.lead` (ink/muted) —
