@@ -207,13 +207,15 @@ function renderDeck(deckPath, opts = {}) {
           return;
         }
         const finalCode = code ?? 3;
+        const destroyed = /has been destroyed|Render process gone|Target closed/i.test(stderrTail);
+        const deterministic = !destroyed && /timed out|rendered 0 slides/i.test(stderrTail);
         const crashed = finalCode === 3 && !fs.existsSync(path.join(outDir, "report.json"));
-        if (crashed && attemptNo === 1) {
-          if (/has been destroyed|Render process gone|Target closed/i.test(stderrTail)) {
-            console.error("render: the app window was destroyed (Electron crash) — this is transient, retrying once");
-          } else {
-            console.error("render: the renderer crashed before writing a report — retrying once");
-          }
+        if (crashed && attemptNo === 1 && !deterministic) {
+          console.error(
+            destroyed
+              ? "render: the app window was destroyed (Electron crash) — this is transient, retrying once"
+              : "render: the renderer crashed before writing a report — retrying once",
+          );
           runOnce(2);
           return;
         }
@@ -224,7 +226,29 @@ function renderDeck(deckPath, opts = {}) {
       // they are still useful when the export was blocked (exit 4).
       const report = readJson(path.join(outDir, "report.json"));
       const inventory = readJson(path.join(outDir, "inventory.json"));
-      if (finalCode !== 0 && !report) {
+      if (crashed) {
+        // No retry left (or a deterministic failure): say WHAT crashed and
+        // echo the captured stderr. In the real case the model got only
+        // "Object has been destroyed" and started guessing about disk space.
+        const tail = stderrTail.trim().split("\n").filter(Boolean).slice(-3).join(" | ");
+        if (destroyed) {
+          console.error(
+            "render: the app window was destroyed twice — the app session is broken, not the deck. " +
+              "Tell the user to restart the app before retrying; do not guess about disk space.",
+          );
+        } else if (deterministic) {
+          console.error(
+            "render: the app reported a deterministic render failure (timeout / 0 slides) — not retried. " +
+              "Fix the deck: simplify the slide HTML and remove custom <script> code.",
+          );
+        } else {
+          console.error(
+            "render: the renderer crashed twice before writing a report — the page likely throws at runtime; " +
+              "remove custom <script> code (keep the example navigator) or rewrite the deck, then retry.",
+          );
+        }
+        if (tail) console.error("render: last renderer stderr: " + tail.slice(0, 500));
+      } else if (finalCode !== 0 && !report) {
         console.error(
           "render: the deck produced no report — the HTML is likely malformed (an unclosed </section>) or throws at runtime; " +
             "lint-deck reports unbalanced <section> tags — fix them or rewrite the whole file",

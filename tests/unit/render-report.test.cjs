@@ -5,7 +5,10 @@
 //   1. report/inventory are parsed before the temp dir is removed, so probe
 //      findings survive the render-only flow (validate.cjs relies on it);
 //   2. deliverables are copied next to deck.html when no --out-dir is given;
-//   3. an explicit --out-dir suppresses the copy.
+//   3. an explicit --out-dir suppresses the copy;
+//   4. a renderer crash (Electron "Object has been destroyed") is retried once,
+//      a repeated crash gets an actionable message + the stderr tail, and a
+//      deterministic timeout is not retried.
 //
 //   node tests/unit/render-report.test.cjs
 "use strict";
@@ -23,6 +26,17 @@ const argv = process.argv.slice(2);
 const flag = (n) => argv[argv.indexOf(n) + 1];
 const deck = argv[argv.indexOf("--deck-render") + 1];
 const out = flag("--out-dir");
+if (process.env.STUB_CRASH_ALWAYS === "1") {
+  if (process.env.STUB_CRASH_COUNTER) fs.appendFileSync(process.env.STUB_CRASH_COUNTER, "x");
+  console.error("Error: Object has been destroyed");
+  console.error("    at Renderer.<anonymous> (deck-render.js:1:1)");
+  process.exit(3);
+}
+if (process.env.STUB_TIMEOUT === "1") {
+  if (process.env.STUB_CRASH_COUNTER) fs.appendFileSync(process.env.STUB_CRASH_COUNTER, "x");
+  console.error("render: timed out after 240s");
+  process.exit(3);
+}
 if (process.env.STUB_CRASH_ONCE === "1") {
   const marker = process.env.STUB_CRASH_MARKER;
   if (marker && !fs.existsSync(marker)) {
@@ -156,6 +170,51 @@ async function main() {
   delete process.env.STUB_CRASH_MARKER;
   assert.strictEqual(r7.code, 0, "the retry must succeed after one crash");
   assert.ok(fs.existsSync(crashMarker), "the first attempt must have crashed");
+
+  // 8. A repeated Electron crash: exactly one retry, then an actionable "app
+  //    session is broken" line plus the captured stderr tail (the real case
+  //    ended with the model guessing about disk space).
+  {
+    process.env.STUB_CRASH_ALWAYS = "1";
+    const counter = path.join(dir, "crash-always.count");
+    process.env.STUB_CRASH_COUNTER = counter;
+    const alwaysDeck = path.join(dir, "crash-always.deck.html");
+    fs.writeFileSync(alwaysDeck, "<!doctype html><html><body></body></html>");
+    const captured = [];
+    const origWrite = process.stderr.write.bind(process.stderr);
+    process.stderr.write = (chunk, ...rest) => {
+      captured.push(typeof chunk === "string" ? chunk : chunk.toString());
+      return origWrite(chunk, ...rest);
+    };
+    let r8;
+    try {
+      r8 = await renderDeck(alwaysDeck, { outDir: path.join(dir, "crash-always-out") });
+    } finally {
+      process.stderr.write = origWrite;
+      delete process.env.STUB_CRASH_ALWAYS;
+      delete process.env.STUB_CRASH_COUNTER;
+    }
+    assert.strictEqual(r8.code, 3, "a repeated crash must surface exit 3");
+    assert.strictEqual(fs.readFileSync(counter, "utf8"), "xx", "one retry = exactly two attempts");
+    const log = captured.join("");
+    assert.ok(/app window was destroyed twice/.test(log), "the repeated crash must be named as an Electron crash");
+    assert.ok(/restart the app/i.test(log), "the message must direct the model to the app session, not disk space");
+    assert.ok(/last renderer stderr: .*deck-render\.js/.test(log), "the captured stderr tail must be echoed");
+  }
+
+  // 9. A deterministic app failure (watchdog timeout) is not retried.
+  {
+    process.env.STUB_TIMEOUT = "1";
+    const counter = path.join(dir, "timeout.count");
+    process.env.STUB_CRASH_COUNTER = counter;
+    const timeoutDeck = path.join(dir, "timeout.deck.html");
+    fs.writeFileSync(timeoutDeck, "<!doctype html><html><body></body></html>");
+    const r9 = await renderDeck(timeoutDeck, { outDir: path.join(dir, "timeout-out") });
+    delete process.env.STUB_TIMEOUT;
+    delete process.env.STUB_CRASH_COUNTER;
+    assert.strictEqual(r9.code, 3, "the app timeout must surface exit 3");
+    assert.strictEqual(fs.readFileSync(counter, "utf8"), "x", "a deterministic timeout must not be retried");
+  }
 
   console.log("PASS  render: отчёт переживает очистку temp, артефакты кладутся рядом с deck.html");
 }

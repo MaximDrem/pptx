@@ -190,7 +190,7 @@ Two levels in one report:
 | `plain-cover` | the cover has no visual layer at all | add `cover-art`, decor, a logo or the template background |
 | `image-reuse` | the same non-chrome picture appears on 2+ slides (one generated image on three slides was a real case) | one image = one meaning: vary the file or drop the repeats |
 | `tiny-image` | a full-size picture is rendered as a small tile | enlarge it into an illustration or remove it |
-| `mostly-empty` | the content occupies only the middle of the slide (error: over 40% empty above AND below) | add substance or switch the pattern |
+| `mostly-empty` | the content covers <25% of the slide band (probe error; footer/chrome excluded, decor does not count as content) | add text/blocks/a chart or switch the pattern |
 | `empty-placeholder` | a filled placeholder with no text or content |
 | `split-box` | "backdrop + separate textbox" (text not written as runs in the box) |
 | `contrast` | run contrast: error < 3.0 (WCAG AA large text), warning < 4.5 (WCAG AA body); inheritance-aware and blending translucent fills |
@@ -273,10 +273,11 @@ Exit: 0 — clean; 1 — lint/assets/styles errors; 2 — render did not start;
 no .pptx was produced**. Non-blocking issues are lines to fix, not failures.
 
 Blocking `error` types: `text-clip`, `out-of-bounds` (content, not decor),
-`text-overlap`, `low-contrast`, `blank`/`maybe-blank`, `broken-image`,
-`stage-broken`, `probe-error`, `hidden-slide`, `missing-br`. Everything else
-(`empty-region`, `tight-gap`, `no-accent`, `sparse-box`, `accent-*`,
-`plain-cover`, `img-no-alt`) is a `suggestion` — it never blocks the export.
+`text-overlap`, `low-contrast`, `blank`/`maybe-blank`, `mostly-empty`,
+`broken-image`, `stage-broken`, `probe-error`, `hidden-slide`, `missing-br`.
+Everything else (`empty-region`, `tight-gap`, `no-accent`, `sparse-box`,
+`accent-*`, `plain-cover`, `img-no-alt`) is a `suggestion` — it never blocks
+the export.
 
 ## render.cjs — a standalone render run
 
@@ -293,6 +294,12 @@ without `--pptx/--pdf`) the temp folder is removed after the run, but
 the caller, so probe findings are never lost (`validate.cjs` relies on it). The
 helper timeout is 300s (`PRESENTATION_RENDER_TIMEOUT_MS`), plus the app
 watchdog.
+
+A renderer crash before any report (`Object has been destroyed`, `Render
+process gone`, `Target closed` — exit 3 without `report.json`) is transient:
+the helper captures the child's stderr and retries once automatically. If the
+retry crashes too, the deck or the app session is broken — read the printed
+stderr tail, do not guess about disk space or ask the user to restart the app.
 
 ## report.json — layout issues
 
