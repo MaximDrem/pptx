@@ -26,10 +26,10 @@ If `$GIGATOOL_NODE` is not set, you are not inside the app: say so and stop.
 ... read-pptx.cjs deck.pptx --outline
 
 # extract media (png/jpeg/svg/emf/…) into a folder
-... read-pptx.cjs deck.pptx --extract-media /tmp/deck-media
+... read-pptx.cjs deck.pptx --extract-media deck-media
 
 # full JSON (written to temp; the path is printed)
-... read-pptx.cjs deck.pptx --json /tmp/deck.json
+... read-pptx.cjs deck.pptx --json deck-check/deck.json
 ```
 
 Reading keeps the things a rework needs: bullet markers from `buChar`
@@ -407,8 +407,8 @@ is unavailable it falls back to a static HTML outline instead of failing.
 ```bash
 ... slide.cjs deck.html --list                    # index / role / headline / size
 ... slide.cjs deck.html --get 3                   # exact <section>…</section> of slide 3
-... slide.cjs deck.html --set 3 --from /tmp/slide-3.html
-... slide.cjs deck.html --append --from /tmp/slide-11.html
+... slide.cjs deck.html --set 3 --from deck-check/slide-3.html
+... slide.cjs deck.html --append --from deck-check/slide-11.html
 ... slide.cjs deck.html --set 3 --from -       # fragment on stdin
 ```
 
@@ -460,7 +460,7 @@ charts are snippets from `charts.md`. No libraries in the deck.
 ## shots.cjs — see a .pptx with your own eyes (vision)
 
 ```bash
-... shots.cjs deck.pptx --out-dir /tmp/tpl-shots --keep
+... shots.cjs deck.pptx --out-dir tpl-shots
 ```
 
 Renders every slide of ANY .pptx to `slide-NN.png` via the app's production
@@ -480,7 +480,7 @@ exits 2.
 ## review.cjs — the self-reflection driver (render → look → fix)
 
 ```bash
-... review.cjs deck.html --out-dir /tmp/deck-check [--reference <template.pptx>] [--no-validate]
+... review.cjs deck.html --out-dir deck-check [--reference <template.pptx>] [--no-validate]
 ```
 
 One command for the whole loop: renders the deck, prints the paths of every

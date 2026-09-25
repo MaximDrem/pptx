@@ -211,7 +211,7 @@ function renderDeck(deckPath, opts = {}) {
       let timedOut = false;
       let timer = null;
       let stderrTail = "";
-      // A REUSED out-dir is the normal case (`--out-dir /tmp/deck-check`): stale
+      // A REUSED out-dir is the normal case (`--out-dir deck-check`): stale
       // slide PNGs / report from the previous deck made review.cjs print 30
       // image paths for a 1-slide render, and the model went looking at the
       // wrong pictures. Drop our own artifacts before every attempt — but never

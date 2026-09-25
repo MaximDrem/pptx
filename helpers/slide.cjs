@@ -3,8 +3,8 @@
 //
 //   node slide.cjs deck.html --list
 //   node slide.cjs deck.html --get 3
-//   node slide.cjs deck.html --set 3  --from /tmp/slide-3.html
-//   node slide.cjs deck.html --append --from /tmp/slide-11.html
+//   node slide.cjs deck.html --set 3  --from deck-check/slide-3.html
+//   node slide.cjs deck.html --append --from deck-check/slide-11.html
 //   node slide.cjs deck.html --set 3  --from -        (fragment on stdin)
 //
 // WHY THIS EXISTS: deck.html is one file where the slide opening, logo and

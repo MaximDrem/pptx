@@ -69,7 +69,7 @@ async function main() {
         console.error("index: WARNING — continuing despite lint errors (--force); the .pptx is produced, state what is still wrong in the summary");
       } else {
         console.error("index: lint-deck found blocking errors — fix them, then re-run this command");
-        console.error("index: per-slide fix: slide.cjs deck.html --get N > /tmp/slide-N.html; edit that fragment; slide.cjs deck.html --set N --from /tmp/slide-N.html");
+        console.error("index: per-slide fix: slide.cjs deck.html --get N > deck-check/slide-N.html; edit that fragment; slide.cjs deck.html --set N --from deck-check/slide-N.html");
         console.error("index: after two honest fix attempts deliver anyway: index.cjs deck.html --pptx --force (a stated defect beats no file)");
         console.error("index: do not re-run this exact command without changing deck.html — the same errors come back and the run stalls");
         process.exit(1);

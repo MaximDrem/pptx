@@ -296,3 +296,18 @@ not the font weight. No app change.
   slide and fought the content on slide 4);
 - lint ignores role words (`cover/closing/section/quote`) in the class check
   (false warning on the skeleton).
+
+## Historical: bootstrap doc (merged 2026-09-25)
+
+The root `desktop-ai-app_integration.md` tutorial was merged here and deleted.
+Key conventions it captured that still hold:
+
+- the skill folder ships whole into
+  `desktop-ai-app/packages/desktop-electron/resources/defaults/skills/presentation/`
+  and materializes at the user as `~/.wsc/config/skills/presentation/`
+  (replaced on `.bundle-version` growth) — hence: self-contained folder, no
+  machine-absolute paths, only `path.join(__dirname, …)` / `os.homedir()` /
+  `process.env.*`, must work on Windows too;
+- HTML deck.html on a 1280×720 stage is the single source of truth; the app's
+  own renderer converts it to a native editable .pptx (text, shapes, embedded
+  fonts, notes).

@@ -28,12 +28,14 @@ Each of these has already broken a real deck. They are not style advice.
    an online converter or an npm package. Another builder = a failed task:
    only this pipeline produces native text, embedded fonts and notes. If the
    command does not work, say so and stop — do not improvise an alternative.
-2. **Work in the user's working folder.**
-   `deck.html` is created in the current working directory (the chat workspace)
-   and the `.pptx` lands next to it. Never build the deck in `/tmp` and never
-   create your own folders for it (e.g. `/tmp/folder`) — the user will not see
-   the result, and `lint-deck` fails a deck that lives in temp. Temp is only
-   for drafts, shots and extracted media.
+ 2. **Everything lives in the working folder.**
+    `deck.html` is created in the current working directory (the chat
+    workspace, the one `pwd` showed at start) and the `.pptx` lands next to
+    it; renders, shots, art and edit fragments go into the helper folders
+    there (`deck-check/`, `tpl-shots/`, `images/`, `deck-media/`). Never put
+    user-visible files in `/tmp` and never invent your own folders — the user
+    will not see them, and `lint-deck` fails a deck that lives in temp.
+
 3. **Never `display:none` a slide.**
    Slides are hidden with `.active` (visibility/opacity) only. The export
    engine silently drops `display:none` subtrees: a real deck lost 8 of its 10
@@ -113,14 +115,16 @@ is not writing them:
 
 ## Result contract
 
-- The working folder keeps **exactly two files**: `<kebab-slug>.deck.html` and
-  `<kebab-slug>.pptx`. Source images live in a subfolder (e.g. `images/`) if
-  the user brought them; after the build they are embedded into the HTML.
+- The working folder holds the deliverables — `<kebab-slug>.deck.html` and
+  `<kebab-slug>.pptx` — plus the folders the helpers create next to them:
+  `images/` (deployed art), `tpl-shots/` (template renders),
+  `deck-check/` (deck renders and edit fragments), `deck-media/` (extracted
+  media). Everything the user might open lives here, visible; `/tmp` is only
+  the builder's internal scratch, which it cleans itself. Never invent your
+  own folders (`/tmp/folder`, `output/`, `result/`).
 - No `deck.js`/`deck.ts`/`.py`/build scripts in the result: HTML is the source.
 - Reply to the user with absolute paths to the .pptx and .html plus a one-line
   summary.
-- Drafts, render folders, shots and extracted media go to temp only, never
-  into the project; the deck itself never lives in temp.
 
 ## Command (the only allowed runtime)
 
@@ -186,7 +190,7 @@ a decorative cat stretched as a background. The workflow:
 
 ```bash
 # 1) See the template first: per-slide PNGs + a text digest
-... shots.cjs "<attached.pptx>" --out-dir /tmp/tpl-shots --keep
+... shots.cjs "<attached.pptx>" --out-dir tpl-shots
 
 # 2) Extract tokens + assets AND deploy the key art next to the deck
 #    (--deploy takes the working folder; "." only works with the cd above)
@@ -201,7 +205,7 @@ write deck.html.
 
 Then, **in this order**:
 
-1. READ every `/tmp/tpl-shots/slide-NN.png` (vision). For each slide note:
+1. READ every `tpl-shots/slide-NN.png` (vision). For each slide note:
    role (cover/section/content/closing), background (flat color? photo?
    gradient?), where the logo sits, what is decor vs content. This is the
    ground truth — the parser's roles are hints, your eyes are the verdict.
@@ -274,10 +278,10 @@ Then, **in this order**:
 ### 1C. Rework someone else's .pptx
 
 ```bash
-... shots.cjs deck.pptx --out-dir /tmp/tpl-shots --keep   # see it
+... shots.cjs deck.pptx --out-dir tpl-shots   # see it
 ... read-pptx.cjs deck.pptx --outline                     # texts
 ... read-pptx.cjs deck.pptx --slide 7                     # one slide in full
-... read-pptx.cjs deck.pptx --extract-media /tmp/deck-media
+... read-pptx.cjs deck.pptx --extract-media deck-media
 ```
 
 Read EVERY slide you need one by one (`--slide N`) plus its shot: z-order,
@@ -310,7 +314,7 @@ than surgical inserts.
 
 **For 9+ slides write in TWO passes**: first a complete deck with the cover and
 the first half (it must render), then append the rest with
-`slide.cjs deck.html --append --from /tmp/slide-N.html` (or `--from -`), one
+`slide.cjs deck.html --append --from deck-check/slide-N.html` (or `--from -`), one
 fragment per call. A real 10-slide request produced a 5-slide deck because the
 single huge write was truncated.
 
@@ -326,7 +330,7 @@ edit tool is the wrong instrument here; recover with `slide.cjs`:
 
 1. `slide.cjs deck.html --get N` — prints slide N's exact `<section>…</section>`;
 2. edit that fragment with the write tool (it is one slide);
-3. `slide.cjs deck.html --set N --from /tmp/slide-N.html` — puts it back,
+3. `slide.cjs deck.html --set N --from deck-check/slide-N.html` — puts it back,
    the rest of the file stays byte-identical;
 4. or rewrite the whole file in one write call.
 
@@ -339,9 +343,9 @@ edit tool:
 ```bash
 ... slide.cjs deck.html --list                     # index / role / headline per slide
 ... slide.cjs deck.html --get 3                    # print slide 3's <section>
-#   write the corrected fragment → /tmp/slide-3.html, then:
-... slide.cjs deck.html --set 3 --from /tmp/slide-3.html
-... slide.cjs deck.html --append --from /tmp/slide-11.html
+#   write the corrected fragment → deck-check/slide-3.html, then:
+... slide.cjs deck.html --set 3 --from deck-check/slide-3.html
+... slide.cjs deck.html --append --from deck-check/slide-11.html
 ```
 
 Why: the slide opening, logo and decor markup are IDENTICAL on every slide, so
@@ -465,7 +469,7 @@ Markup rules:
 ### 4. Render loop (look → fix → stop)
 
 ```bash
-... review.cjs deck.html --out-dir /tmp/deck-check
+... review.cjs deck.html --out-dir deck-check
 ```
 
 `review.cjs` renders the deck, prints every `slide-NN.png` to look at, lists
@@ -545,7 +549,7 @@ warnings must at least be mentioned to the user.
 The last gate — look at the EXPORTED deck, not the HTML:
 
 ```bash
-... review.cjs deck.html --out-dir /tmp/deck-final [--reference "<template.pptx>"]
+... review.cjs deck.html --out-dir deck-final [--reference "<template.pptx>"]
 ```
 
 READ the printed PNGs and answer honestly — first per slide, then the deck as a

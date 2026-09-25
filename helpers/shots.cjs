@@ -2,12 +2,12 @@
 // presentation v3 — render a .pptx to per-slide PNGs so a vision-capable model
 // can actually SEE a template/reference deck before copying its style.
 //
-//   node shots.cjs <deck.pptx> [--out-dir <dir>] [--keep]
+//   node shots.cjs <deck.pptx> [--out-dir <dir>]
 //
 // Uses the app's own one-shot renderer (`--pptx-verify`), the same mode the
 // old skill used: it loads the pptx with the production preview renderer and
 // captures every slide. Output: slide-NN.png + report.json in --out-dir
-// (default: a temp dir; pass --out-dir to keep). Prints one line per slide:
+// (default: tpl-shots/ in the working folder; renders stay for the user). Prints one line per slide:
 //   slide 01: /abs/path/slide-01.png
 // plus a compact text digest per slide (title + background + media roles) so
 // the model can jump straight to the right images.
@@ -24,7 +24,7 @@ const { spawn } = require("child_process");
 const { readDeck } = require("./lib/pptx.cjs");
 
 function usage() {
-  console.error("usage: shots.cjs <deck.pptx> [--out-dir <dir>] [--keep]");
+  console.error("usage: shots.cjs <deck.pptx> [--out-dir <dir>]");
   process.exit(2);
 }
 
@@ -114,14 +114,13 @@ async function main() {
   const binary = process.env.GIGATOOL_NODE || process.env.MULTITOOL_NODE;
   if (!binary) {
     console.error("shots: $GIGATOOL_NODE is not set — the app renderer is unavailable.");
-    console.error("fallback: read-pptx.cjs " + JSON.stringify(abs) + " --extract-media /tmp/tpl-media");
+    console.error("fallback: read-pptx.cjs " + JSON.stringify(abs) + " --extract-media tpl-media");
     console.error("then look at the extracted pictures (backgrounds/logos/decor) before reusing them.");
     if (deck) console.log(digest(deck).join("\n"));
     process.exit(2);
   }
 
-  const keep = argv.includes("--keep") || !!flag("--out-dir");
-  const outDir = path.resolve(flag("--out-dir") || fs.mkdtempSync(path.join(os.tmpdir(), "pptx-shots-")));
+  const outDir = path.resolve(flag("--out-dir") || path.join(process.cwd(), "tpl-shots"));
 
   const env = { ...process.env };
   delete env.ELECTRON_RUN_AS_NODE;
@@ -176,17 +175,12 @@ async function main() {
     const pngs = fs.existsSync(outDir) ? fs.readdirSync(outDir).filter((f) => /^slide-\d+\.png$/i.test(f)).sort() : [];
     if (!pngs.length) {
       console.error(`shots: the renderer produced no PNGs (exit ${code}).`);
-      console.error("fallback: read-pptx.cjs " + JSON.stringify(abs) + " --extract-media /tmp/tpl-media");
+      console.error("fallback: read-pptx.cjs " + JSON.stringify(abs) + " --extract-media tpl-media");
       process.exit(3);
     }
     for (const f of pngs) console.log("slide " + f.replace(/\D+/g, "").replace(/^0+(?=\d)/, "") + ": " + path.join(outDir, f));
     if (deck) console.log(digest(deck, pngs.length).join("\n"));
-    console.log(`shots: ${pngs.length} slide(s)${keep ? "" : " (temp dir: " + outDir + ")"}`);
-    if (!keep) {
-      try {
-        fs.rmSync(outDir, { recursive: true, force: true });
-      } catch {}
-    }
+    console.log(`shots: ${pngs.length} slide(s) → ${outDir}`);
   });
 }
 

@@ -61,7 +61,7 @@ async function main() {
     process.exit(2);
   }
   const deck = path.resolve(deckArg);
-  const outDir = path.resolve(flag("--out-dir") || fs.mkdtempSync(path.join(os.tmpdir(), "deck-review-")));
+  const outDir = path.resolve(flag("--out-dir") || path.join(process.cwd(), "deck-check"));
 
   // Cheap preflight BEFORE the browser: catch missing/misnamed local files
   // (a typo like images/template-bbg-1.png used to surface only as a
@@ -124,7 +124,7 @@ async function main() {
   if (blocking.length) {
     console.log(
       `\nACTION: fix the ${blocking.length} blocking error(s) above in deck.html ` +
-        `(slide.cjs deck.html --get N → edit the fragment → slide.cjs deck.html --set N --from /tmp/slide-N.html; ` +
+        `(slide.cjs deck.html --get N → edit the fragment → slide.cjs deck.html --set N --from deck-check/slide-N.html; ` +
         `or rewrite the whole file in ONE write call), then run review once. ` +
         `Do not re-run review without changing deck.html — the same errors come back and the run stalls. ` +
         `If the same blocker survived two honest repairs, deliver with index.cjs deck.html --pptx --force and state the remaining defect.`,
@@ -167,7 +167,7 @@ async function main() {
       for (const line of out.split("\n")) if (line.startsWith("slide ")) console.log("  " + line.replace(/^slide \d+: /, ""));
     } catch (e) {
       console.log("  reference shots unavailable: " + String((e.stdout || e.message || e)).trim().split("\n")[0]);
-      console.log("  fallback: read-pptx.cjs <template.pptx> --extract-media /tmp/tpl-media and look at the pictures");
+      console.log("  fallback: read-pptx.cjs <template.pptx> --extract-media tpl-media and look at the pictures");
     }
   }
 

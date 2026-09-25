@@ -273,7 +273,7 @@ function lintDeck(deckPath, opts = {}) {
         errors.push(
           `slide ${secIndex}: raw <${rawTag[1].toLowerCase()}> inside .${boxClass} — box text must be runs (.t-title/.t-body/.t-cap, <b>, <br>), nothing else in the box (export merge + style; patterns.md → One-box rule). ` +
             `Fix it in deck.html (your source, not the build): <${rawTag[1].toLowerCase()}>text</${rawTag[1].toLowerCase()}> → <span class="${/^h[1-6]$/.test(rawTag[1].toLowerCase()) ? "t-title" : "t-body"}">text</span>; rows are separated by <br>, not by block tags. ` +
-            `Per-slide edits: slide.cjs deck.html --get ${secIndex} > /tmp/slide-${secIndex}.html, edit the fragment, slide.cjs deck.html --set ${secIndex} --from /tmp/slide-${secIndex}.html`,
+            `Per-slide edits: slide.cjs deck.html --get ${secIndex} > deck-check/slide-${secIndex}.html, edit the fragment, slide.cjs deck.html --set ${secIndex} --from deck-check/slide-${secIndex}.html`,
         );
         break;
       }
