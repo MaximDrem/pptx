@@ -56,11 +56,34 @@ function digest(deck, limit) {
       });
       lines.push(`    media: ${parts.join("; ")}${pics.length > 5 ? `; +${pics.length - 5} more` : ""}`);
     }
-    const boxes = s.elements.filter((e) => e.kind === "shape" && e.fill && e.fill.type && e.fill.type !== "none");
+    const flat = [];
+    const flatten = (els) => {
+      for (const e of els || []) {
+        flat.push(e);
+        if (e.children) flatten(e.children);
+      }
+    };
+    flatten(s.elements);
+    const boxes = flat.filter((e) => e.kind === "shape" && e.fill && e.fill.type && e.fill.type !== "none");
     if (boxes.length) {
       const fills = [...new Set(boxes.map((b) => b.fill.hex).filter(Boolean))].slice(0, 4);
       const texts3 = texts.slice(0, 3).map((t) => "«" + t.replace(/\s+/g, " ").slice(0, 28) + "»").join(", ");
       lines.push(`    boxes: ${boxes.length} filled shape(s)${fills.length ? " (" + fills.join(", ") + ")" : ""}; texts: ${texts3}`);
+    }
+    const conns = flat.filter((e) => e.kind === "connector");
+    if (conns.length) {
+      const arrows = conns.filter((e) => e.line && (e.line.headEnd || e.line.tailEnd)).length;
+      lines.push(`    connectors: ${conns.length}${arrows ? ` (${arrows} with arrowheads — flows/paths; use the .flow/.steps patterns, not images)` : ""}`);
+    }
+    for (const t of flat.filter((e) => e.frame === "table" && e.table)) {
+      const data = t.table.rowsData || [];
+      const rows = t.table.rows || data.length;
+      const cols = t.table.cols || Math.max(0, ...data.map((r) => (r.cells || []).length));
+      const head = (data[0]?.cells || [])
+        .slice(0, 3)
+        .map((c) => String(c.text || "").split("\n")[0].slice(0, 18))
+        .join(" | ");
+      lines.push(`    table ${rows}×${cols}: «${head}»`);
     }
   }
   return lines;

@@ -13,7 +13,7 @@ BrowserWindow, which already exists in production for `--pptx-verify`.
 | From (this repository) | To (desktop-ai-app) |
 |---|---|
 | `presentation_v3/*` | `packages/desktop-electron/resources/defaults/skills/presentation/` (delete the folder and replace it entirely) |
-| `presentation_v3/.bundle-version` (= 58) | already inside the folder above |
+| `presentation_v3/.bundle-version` (= 59) | already inside the folder above |
 | `presentation_v3/app/deck-render.ts` | `src/main/deck-render.ts` |
 | the detector from `deck-render.ts` (`isRunDeckRender`) | `src/main/deck-render-check.ts` (mirroring `pptx-verify-check.ts`) |
 
@@ -24,7 +24,7 @@ cp -r /path/to/presentation_v3 packages/desktop-electron/resources/defaults/skil
 git add packages/desktop-electron/resources/defaults/skills/presentation
 ```
 
-Verify `.bundle-version` = `58` (the currently installed one = 35; when the
+Verify `.bundle-version` = `59` (the currently installed one = 35; when the
 number increases, `seed-defaults.ts` deletes the user's folder and re-seeds it
 entirely — the old skill rolls out by itself).
 
@@ -96,7 +96,7 @@ as in `--pptx-verify`.
 
 `presentation` is already in `versionStampedSkills` (the line exists in the
 current version) — no code change is needed, only the new
-`.bundle-version = 58`. If the line is actually missing, add it following the
+`.bundle-version = 59`. If the line is actually missing, add it following the
 neighboring skills.
 
 ### 2.5 Packaging
@@ -271,3 +271,28 @@ failure. Lint messages for the one-box rule / missing footer / missing
 background / missing decor now include the exact paste-ready snippet, and
 LOW-CONTRAST names the measured text color and says to fix the color/backdrop,
 not the font weight. No app change.
+
+## 14. v59 addition: case-8 fixes (loop-breaking messages, slide count, language)
+- language is not flexible: SKILL rule 0 now says **always Russian**, whatever
+  the user's language — the "user's language" wording invited an English run;
+- **no permanent export block**: `index.cjs`/`render.cjs` accept `--force`
+  (app: `--allow-blocking`). After two honest fix attempts the agent exports
+  despite blocking findings with a loud warning and states the remaining
+  defects — a delivered deck with a known defect beats a stalled run with no
+  file. The review ACTION line and the index lint failure print this path.
+
+- probe `missing-br` names the box and the exact pair and says the `<br>` goes
+  BETWEEN the rows — a real run put it after the last row and looped four
+  review cycles because the message never said where;
+- `review.cjs` prints a STATIC LINT block (the authored-file lint that gates
+  the export), so a raw `<h3>/<p>` inside a box is named next to the probe
+  finding;
+- SKILL: reply in the user's language (a real run finished with an English
+  summary); a numbered slide plan before writing; 8 slides or fewer in one
+  write, 9+ in two passes with `slide.cjs --append` (a 10-slide request
+  produced a 5-slide deck because the single write truncated); a count check
+  via `slide.cjs --list` before rendering; decor-placement and box-variety
+  reminders (one decorative photo was pasted into the same corner on every
+  slide and fought the content on slide 4);
+- lint ignores role words (`cover/closing/section/quote`) in the class check
+  (false warning on the skeleton).

@@ -123,8 +123,24 @@ async function main() {
       `\nACTION: fix the ${blocking.length} blocking error(s) above in deck.html ` +
         `(slide.cjs deck.html --get N → edit the fragment → slide.cjs deck.html --set N --from /tmp/slide-N.html; ` +
         `or rewrite the whole file in ONE write call), then run review once. ` +
-        `Do not re-run review without changing deck.html — the same errors come back and the run stalls.`,
+        `Do not re-run review without changing deck.html — the same errors come back and the run stalls. ` +
+        `If the same blocker survived two honest repairs, deliver with index.cjs deck.html --pptx --force and state the remaining defect.`,
     );
+  }
+
+  // Static lint runs on the authored file and is the export gate. Printing it
+  // here catches markup mistakes the render cannot name precisely (raw <h3>/<p>
+  // inside a box, missing footer) next to the probe findings.
+  console.log("\n=== STATIC LINT (export gate) ===");
+  try {
+    const out = execFileSync(process.execPath, [path.join(__dirname, "lint-deck.cjs"), deck], { encoding: "utf8" });
+    console.log("  " + out.trim().split("\n").slice(-1)[0]);
+  } catch (e) {
+    const text = `${e.stdout || ""}\n${e.stderr || ""}`.trim();
+    const errs = text.split("\n").filter((l) => l.startsWith("error:"));
+    for (const l of errs.slice(0, 6)) console.log("  " + l);
+    if (errs.length > 6) console.log(`  … +${errs.length - 6} more lint error(s)`);
+    if (!errs.length) console.log("  lint failed: " + (e.message || e));
   }
 
   // Structural read: same facts the eye gets from the PNGs — background layer,

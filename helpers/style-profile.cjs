@@ -149,46 +149,98 @@ function pickColors(deck) {
   // Better evidence: if the template paints its content boxes with a specific
   // fill (usually a translucent white/black), reuse it — otherwise the copied
   // cards look nothing like the original (real incident: flat navy cards vs
-  // the template's rgba(255,255,255,0.15) boxes). Keep the runner-up fills too:
-  // templates usually mix 2–3 box styles, and a copy with one style everywhere
-  // reads as monotonous (real case: identical grey squares on every slide).
-  const fillCount = new Map();
+  // the template's rgba(255,255,255,0.15) boxes). Templates mix several box
+  // LOOKS (fill, corner rounding, border, glow) — a copy with one style
+  // everywhere reads as monotonous. Collect the distinct recipes as facts;
+  // the HTML forms for them live in patterns.md → "Box variants".
+  const boxStyles = new Map();
   const boxAreaMin = deck.slideSize.emu.cx * deck.slideSize.emu.cy * 0.005;
   const boxAreaMax = deck.slideSize.emu.cx * deck.slideSize.emu.cy * 0.8;
+  const fillCss = (f) =>
+    f.alpha < 0.99
+      ? `rgba(${parseInt(f.hex.slice(1, 3), 16)}, ${parseInt(f.hex.slice(3, 5), 16)}, ${parseInt(f.hex.slice(5, 7), 16)}, ${+f.alpha.toFixed(2)})`
+      : f.hex;
+  const radiusPct = (el) => {
+    const adj = (el.adj || []).find((a) => a.name === "adj" && /val\s+\d+/.test(a.fmla || ""));
+    if (!adj) return null;
+    const v = Number(/val\s+(\d+)/.exec(adj.fmla)[1]) / 1000; // 50000 → 50%
+    return Math.round(v * 10) / 10;
+  };
+  const fillDesc = (el) => {
+    const f = el.fill;
+    if (f && f.type === "solid" && f.hex) return fillCss(f);
+    if (f && f.type === "gradient" && f.stops && f.stops.length) {
+      const a = f.stops[0];
+      const b = f.stops[f.stops.length - 1];
+      return `gradient ${a.hex || "?"}→${b.hex || "?"}${f.angle !== null && f.angle !== undefined ? ` ${Math.round(f.angle)}°` : ""}`;
+    }
+    if (f && f.type === "image") return "picture fill";
+    if (f && f.type === "pattern") return "pattern fill";
+    return null;
+  };
+  const styleOf = (el) => {
+    const f = el.fill && el.fill.type === "solid" && el.fill.hex ? el.fill : null;
+    const ln = el.line && !el.line.none ? el.line : null;
+    const border =
+      ln && ln.fill && ln.fill.hex
+        ? `${ln.wPt || 1}px border ${fillCss(ln.fill)}`
+        : ln && ln.fill && ln.fill.type === "gradient"
+          ? "gradient border"
+          : ln
+            ? "border"
+            : "";
+    const shape =
+      el.geom === "roundRect"
+        ? `rounded${radiusPct(el) !== null ? ` ~${radiusPct(el)}%` : ""}`
+        : el.geom === "rect"
+          ? "square corners"
+          : el.geom || "";
+    const effect = el.effects && el.effects.glow ? "glow" : el.effects && el.effects.shadow ? "shadow" : "";
+    const desc = [fillDesc(el) || "no solid fill", shape, border, effect].filter(Boolean).join(", ");
+    return { f, desc, key: desc };
+  };
+  // Per-slide look counts feed the Layout recipes (facts, not prescriptions).
+  const slideLooks = new Map();
   const walkFills = (els, slideNo) => {
     for (const el of els || []) {
-      const f = el.fill;
       const b = el.box && el.box.emu;
-      if (f && f.type === "solid" && f.hex && b) {
-        const a = (b.w || 0) * (b.h || 0);
-        const alpha = f.alpha === undefined ? 1 : f.alpha;
-        const key = `${f.hex}:${alpha}`;
-        if (a >= boxAreaMin && a <= boxAreaMax && !(alpha < 0.05)) {
-          if (!fillCount.has(key)) fillCount.set(key, { hex: f.hex, alpha, count: 0, slides: new Set() });
-          const rec = fillCount.get(key);
-          rec.count++;
-          if (slideNo) rec.slides.add(slideNo);
+      const area = b ? (b.w || 0) * (b.h || 0) : 0;
+      const f = el.fill && el.fill.type === "solid" && el.fill.hex ? el.fill : null;
+      const ln = el.line && !el.line.none ? el.line : null;
+      // A visible surface only: boxes with fill, border or glow. Empty text
+      // frames (no paint at all) used to flood the list with 187 "no solid
+      // fill" entries and hid the real variants.
+      const visible = !!f || !!fillDesc(el) || !!(ln && (ln.fill || ln.wPt)) || !!(el.effects && (el.effects.glow || el.effects.shadow));
+      if (b && area >= boxAreaMin && area <= boxAreaMax && el.geom !== "ellipse" && visible) {
+        const { desc, key } = styleOf(el);
+        if (!boxStyles.has(key)) boxStyles.set(key, { css: f ? fillCss(f) : null, hex: f ? f.hex : null, alpha: f ? +(f.alpha === undefined ? 1 : f.alpha).toFixed(2) : null, desc, count: 0, slides: new Set() });
+        const rec = boxStyles.get(key);
+        rec.count++;
+        if (slideNo) {
+          rec.slides.add(slideNo);
+          if (!slideLooks.has(slideNo)) slideLooks.set(slideNo, new Map());
+          const per = slideLooks.get(slideNo);
+          per.set(desc, (per.get(desc) || 0) + 1);
         }
       }
       if (el.children) walkFills(el.children, slideNo);
     }
   };
   for (const s of deck.slides) walkFills(s.elements, s.index); // s.index is 1-based already
-  const topFills = [...fillCount.values()].sort((a, b) => b.count - a.count);
+  const topFills = [...boxStyles.values()]
+    .filter((v) => v.hex && v.count >= 2)
+    .sort((a, b) => b.count - a.count);
   const boxFill = topFills.find((f) => f.hex.toLowerCase() !== String(bgHex).toLowerCase()) || null;
-  const fillCss = (f) =>
-    f.alpha < 0.99
-      ? `rgba(${parseInt(f.hex.slice(1, 3), 16)}, ${parseInt(f.hex.slice(3, 5), 16)}, ${parseInt(f.hex.slice(5, 7), 16)}, ${+f.alpha.toFixed(2)})`
-      : f.hex;
   let surfaceSource = null;
   if (boxFill && boxFill.count >= 2) {
-    surface = fillCss(boxFill);
-    surfaceSource = { fill: boxFill.hex, alpha: +boxFill.alpha.toFixed(2), shapes: boxFill.count };
+    surface = boxFill.css;
+    surfaceSource = { fill: boxFill.hex, alpha: boxFill.alpha, shapes: boxFill.count };
   }
-  const fillVariants = topFills
-    .filter((f) => f.count >= 2 && f.hex.toLowerCase() !== String(bgHex).toLowerCase())
-    .slice(0, 3)
-    .map((f) => ({ css: fillCss(f), hex: f.hex, alpha: +f.alpha.toFixed(2), shapes: f.count, slides: [...f.slides].sort((a, b) => a - b).slice(0, 6) }));
+  const fillVariants = [...boxStyles.values()]
+    .filter((v) => v.count >= 2 && !(v.hex && v.hex.toLowerCase() === String(bgHex).toLowerCase()))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 4)
+    .map((v) => ({ css: v.css, hex: v.hex, alpha: v.alpha, shapes: v.count, slides: [...v.slides].sort((a, b) => a - b).slice(0, 6), desc: v.desc }));
 
   return {
     theme,
@@ -199,6 +251,7 @@ function pickColors(deck) {
     surface,
     surfaceSource,
     fillVariants,
+    slideLooks,
     ink,
     muted,
     darkBg,
@@ -340,6 +393,26 @@ function deployAssets(assetsDir, written, deckDir, deck, colors) {
   const images = path.join(deckDir, "images");
   fs.mkdirSync(images, { recursive: true });
   const infoByName = new Map(((deck && deck.media) || []).map((m) => [m.name, m]));
+  // Per-media usage facts from the slides: cropping and transparency are on
+  // the PICTURE, not on the media file, so an extracted asset alone loses them.
+  const mediaMeta = new Map();
+  const noteMediaMeta = (els) => {
+    for (const el of els || []) {
+      if (el.media && !mediaMeta.has(el.media)) mediaMeta.set(el.media, { crop: el.crop || null, alphaPct: el.alphaPct == null ? null : el.alphaPct });
+      if (el.children) noteMediaMeta(el.children);
+    }
+  };
+  for (const s of (deck && deck.slides) || []) noteMediaMeta(s.elements);
+  const cropText = (crop) => {
+    if (!crop) return null;
+    const bits = [];
+    for (const [k, label] of [["l", "left"], ["t", "top"], ["r", "right"], ["b", "bottom"]]) {
+      if (crop[k]) bits.push(`${label} ${Math.round(crop[k])}%`);
+    }
+    return bits.length
+      ? `The template crops this file (${bits.join(", ")}) — keep the same framing (object-position/object-fit; \`.media\` blocks crop with cover)`
+      : null;
+  };
   const roleOf = (name) => (infoByName.get(name) || {}).role || "graphic";
   const dimsOf = (name) => {
     const i = infoByName.get(name) || {};
@@ -516,23 +589,21 @@ function deployAssets(assetsDir, written, deckDir, deck, colors) {
     const info = infoByName.get(a.name) || {};
     const light = info.visual && info.visual.luminance > 0.85;
     lines.push(
-      `## Decor ${i + 1} (${dimsOf(a.name)})`,
+      `## Element ${i + 1} (${dimsOf(a.name)}) — auto-role: decor`,
       "",
       rows.length
-        ? `In the template it appears at: ${fmt(rows)} (reference only)`
+        ? `In the template it appears at: ${fmt(rows)} (reference, not a rule)`
         : viaLayout.length
           ? `From the slide layout — visible on template slides ${viaLayout.slice(0, 6).join(", ")}${viaLayout.length > 6 ? " …" : ""}`
           : "Placement in the template is unclear — it is an edge illustration.",
       "",
       ...(light ? ["Near-white art: it only reads on a dark background — check the render if you put it on a light surface.", ""] : []),
-      "Stage px (1280×720), 1:1 with this deck. These are HINTS from the template's own layout: the template does NOT repeat decor at identical coordinates — it moves, mirrors, scales, bleeds it off an edge, or stacks two elements (a blob under an arrow). Do the same: if you reuse this element on several slides, move/resize/mirror it or pick another deployed decor.",
-      "",
-      "If your slide's text occupies this area, bleed the decor off an edge (negative left/top or right/bottom offsets), shrink it, or pick another decor — an image over text is a blocking TEXT-OVERLAP error.",
+      `Look at \`images/${n}\` before using it: what is it (blob, arrow, icon, photo…), is it content or atmosphere, does your slide need it at all? The auto-role is a guess — your eyes decide. The template moves, mirrors, scales and bleeds its art per slide; bleeding off an edge is fine. Suggestions (\`decor-stamp\`, \`decor-under-text\`) only flag repetition and overlaps for your judgement.`,
       "",
       "```html",
       rows.length
-        ? `<img class="decor-img" style="left:${rows[0].x}px; top:${rows[0].y}px; width:${rows[0].w}px" src="images/${n}" alt="">`
-        : `<img class="decor-img pos-tr" src="images/${n}" alt="">`,
+        ? `<img class="decor-img" style="left:${rows[0].x}px; top:${rows[0].y}px; width:${rows[0].w}px" src="images/${n}" alt="">   <!-- the template's own placement -->`
+        : `<img class="decor-img" style="..." src="images/${n}" alt="">`,
       "```",
       "",
     );
@@ -542,19 +613,22 @@ function deployAssets(assetsDir, written, deckDir, deck, colors) {
     const rows = usage(a.name);
     const square = rows.some((r) => r.w === r.h);
     lines.push(
-      `## Photo ${i + 1} (${dimsOf(a.name)})`,
+      `## Photo ${i + 1} (${dimsOf(a.name)}) — auto-role: photo`,
       "",
-      rows.length ? `In the template: ${fmt(rows, 3)}` : "A photo used by the template.",
+      rows.length ? `In the template: ${fmt(rows, 3)} (reference)` : "A photo used by the template.",
+      ...(cropText((mediaMeta.get(a.name) || {}).crop) ? [cropText((mediaMeta.get(a.name) || {}).crop), ""] : []),
+      ...((mediaMeta.get(a.name) || {}).alphaPct != null
+        ? [`The template shows it at ${Math.round(mediaMeta.get(a.name).alphaPct)}% opacity (use \`opacity\` on the element if that layering matters).`, ""]
+        : []),
       "",
-      "Use it where the layout calls for a picture — as positioned art (snippet below) or inside a `.media` block in a pattern (same file). One image = one meaning; never reuse one file on two slides.",
+      `Look at \`images/${n}\`: what does it show, and what is the slide about? Decide whether your slide needs a picture at all, and where it illustrates the content — the auto-role is a guess, your eyes decide. Keep the aspect (set only width, never width+height). One image = one meaning; never reuse one file on two slides.`,
       "",
       "```html",
-      rows.length
-        ? `<img class="decor-img${square ? " round" : ""}" style="left:${rows[0].x}px; top:${rows[0].y}px; width:${rows[0].w}px" src="images/${n}" alt="">`
-        : `<img class="decor-img pos-br" src="images/${n}" alt="">`,
+      `<img class="decor-img${square ? " round" : ""}" style="left:…; top:…; width:…px" src="images/${n}" alt="">   <!-- positioned inset -->`,
+      `<div class="split"><div class="media"><img src="images/${n}" alt=""></div><div class="content">…</div></div>   <!-- or inside a pattern -->`,
       "```",
       "",
-      square ? "The template crops this photo as a circle (`class=\"decor-img round\"`)." : "",
+      square ? "The source is square — the template crops it as a circle (`class=\"decor-img round\"`)." : "",
       "",
     );
   });
@@ -562,11 +636,11 @@ function deployAssets(assetsDir, written, deckDir, deck, colors) {
     const n = copyAs(a, `template-icon-${i + 1}`);
     const rows = usage(a.name);
     lines.push(
-      `## Icon ${i + 1} (${dimsOf(a.name)})`,
+      `## Icon ${i + 1} (${dimsOf(a.name)}) — auto-role: icon`,
       "",
-      rows.length ? `In the template: ${fmt(rows, 3)}` : "An icon used by the template.",
+      rows.length ? `In the template: ${fmt(rows, 3)} (reference)` : "An icon used by the template.",
       "",
-      "3D icon art — the template places 2–4 of them around a slide as accents. Use it instead of drawing your own shape; one icon per idea.",
+      `Look at \`images/${n}\`: the template places 2–4 of them around a slide as accents. Decide whether your slide needs it and where it supports the idea.`,
       "",
       "```html",
       rows.length
@@ -580,40 +654,20 @@ function deployAssets(assetsDir, written, deckDir, deck, colors) {
     lines.push("_The template has no reusable background/logo/decor (a flat token-only style)._");
   }
   if (colors && colors.fillVariants && colors.fillVariants.length) {
-    lines.push("## Box styles (the template mixes them)", "");
+    lines.push("## Box styles — what the template actually uses (facts)", "");
     for (const v of colors.fillVariants) {
-      lines.push(`- ${v.css} — ${v.shapes} box(es) on slides ${v.slides.join(", ") || "?"}`);
+      lines.push(`- ${v.desc || v.css} — ${v.shapes} box(es) on slides ${v.slides.join(", ") || "?"}`);
     }
     lines.push(
       "",
-      "The profile tokens expose these as `--c-surface` (main) and `--c-surface-2` (runner-up). Paste-ready classes:",
-      "- `.card` — the template's main surface;",
-      "- `.card.deep` — the runner-up fill (`--c-surface-2`);",
-      "- `.card.tint` — translucent accent (`--c-accent-soft`);",
-      "- `.card.ghost` — outline-only (transparent, keeps the border);",
-      "- `.card.inverse` — ink background / bg-colored text.",
+      "Look at these on the template shots, then pick the matching HTML form from patterns.md → **Box variants** (`.card`, `.card.deep`, `.card.ghost`, `.card.tint`, `.card.accent`, `.card.inverse`; rows/tables/steps are separate patterns).",
+      "The profile tokens expose the two main fills as `--c-surface` and `--c-surface-2`.",
       "",
-      "Alternate them across slides the way the template does — the same box on every slide is what makes a copy look generated.",
+      "Do not render every box as plain `.card`: the same box on every slide is what makes a copy look generated.",
       "",
     );
   }
   // Per-slide recipes: what the template actually composes, in deployed names.
-  const slideFills = (els, map) => {
-    for (const el of els || []) {
-      const f = el.fill;
-      if (f && f.type === "solid" && f.hex) {
-        const alpha = f.alpha === undefined ? 1 : f.alpha;
-        if (alpha >= 0.05) {
-          const key =
-            alpha < 0.99
-              ? `rgba(${parseInt(f.hex.slice(1, 3), 16)}, ${parseInt(f.hex.slice(3, 5), 16)}, ${parseInt(f.hex.slice(5, 7), 16)}, ${+alpha.toFixed(2)})`
-              : f.hex;
-          map.set(key, (map.get(key) || 0) + 1);
-        }
-      }
-      if (el.children) slideFills(el.children, map);
-    }
-  };
   const recipes = [];
   const brandNames = new Set(brandings.map((a) => a.name));
   ((deck && deck.slides) || []).slice(0, 24).forEach((s, i) => {
@@ -635,9 +689,34 @@ function deployAssets(assetsDir, written, deckDir, deck, colors) {
         `${shown} @${px ? Math.round(px.x) : "?"},${px ? Math.round(px.y) : "?"}` + (px && px.rot ? ` rot${Math.round(px.rot)}°` : ""),
       );
     }
-    const fills = new Map();
-    slideFills(s.elements, fills);
-    if (fills.size) parts.push(`boxes: ${[...fills.entries()].map(([k, n]) => `${k}×${n}`).join(", ")}`);
+    const looks = colors && colors.slideLooks ? colors.slideLooks.get(s.index) : null;
+    if (looks && looks.size) {
+      const top = [...looks.entries()].sort((a, b) => b[1] - a[1]).slice(0, 2);
+      parts.push(`boxes: ${top.map(([k, n]) => `${k}×${n}`).join(", ")}${looks.size > 2 ? " …" : ""}`);
+    }
+    const all = [];
+    const flattenAll = (els) => {
+      for (const el of els || []) {
+        all.push(el);
+        if (el.children) flattenAll(el.children);
+      }
+    };
+    flattenAll(s.elements);
+    const conns = all.filter((el) => el.kind === "connector");
+    if (conns.length) {
+      const arrows = conns.filter((el) => el.line && (el.line.headEnd || el.line.tailEnd)).length;
+      parts.push(`connectors: ${conns.length}${arrows ? ` (${arrows} with arrowheads)` : ""}`);
+    }
+    for (const t of all.filter((el) => el.frame === "table" && el.table)) {
+      const data = t.table.rowsData || [];
+      const rows = t.table.rows || data.length;
+      const cols = t.table.cols || Math.max(0, ...data.map((r) => (r.cells || []).length));
+      const head = (data[0]?.cells || [])
+        .slice(0, 3)
+        .map((c) => String(c.text || "").split("\n")[0].slice(0, 18))
+        .join(" | ");
+      parts.push(`table ${rows}×${cols}: «${head}»`);
+    }
     const title = firstText(s.elements);
     recipes.push(`- slide ${s.index ?? i + 1}${title ? ` («${title}»)` : ""}: ${parts.join("; ") || "empty"}`);
   });
@@ -674,7 +753,10 @@ function tokensCss(p, slug) {
   --slide-bg: ${p.bg};
   --c-bg: ${p.bg};
   --c-surface: ${p.surface};
-  --c-surface-2: ${p.fillVariants && p.fillVariants[1] ? p.fillVariants[1].css : p.surface};
+  --c-surface-2: ${(() => {
+    const second = (p.fillVariants || []).find((v) => v.css && v.css !== p.surface);
+    return second ? second.css : p.surface;
+  })()};
   --c-ink: ${p.ink};
   --c-muted: ${p.muted};
   --c-accent: ${p.accent};

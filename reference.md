@@ -32,6 +32,13 @@ If `$GIGATOOL_NODE` is not set, you are not inside the app: say so and stop.
 ... read-pptx.cjs deck.pptx --json /tmp/deck.json
 ```
 
+Reading keeps the things a rework needs: bullet markers from `buChar`
+(`• …` in `--outline`), table cells (`frame: "table"`, rows/cols with text and
+fills), connector counts with arrowheads, gradients (stops + angle), picture
+crops (`crop`), transparency (`alphaPct`), shadows and autofit
+(`fontScalePct`). Groups are walked, so nested art is listed with its real
+position.
+
 What `--slide N` shows (z-order = paint order, bottom layers first):
 
 ```
@@ -281,7 +288,7 @@ automatically, so normally you never run it by hand.
 ## index.cjs — the whole pipeline in one command
 
 ```bash
-... index.cjs deck.html [--pptx] [--pdf] [--no-png] [--out-dir <dir>] [--no-lint]
+... index.cjs deck.html [--pptx] [--pdf] [--no-png] [--out-dir <dir>] [--no-lint] [--force]
 ```
 
 1. `expand-styles.cjs` — install the canonical CSS into the managed block;
@@ -302,13 +309,14 @@ Blocking `error` types: `text-clip`, `out-of-bounds` (content, not decor),
 `text-overlap`, `low-contrast`, `blank`/`maybe-blank`, `mostly-empty`,
 `broken-image`, `stage-broken`, `probe-error`, `hidden-slide`, `missing-br`.
 Everything else (`empty-region`, `tight-gap`, `no-accent`, `sparse-box`,
-`accent-*`, `plain-cover`, `img-no-alt`) is a `suggestion` — it never blocks
+`accent-*`, `plain-cover`, `img-no-alt`, `decor-stamp`, `decor-under-text`,
+`stretched-image`) is a `suggestion` — it never blocks
 the export.
 
 ## render.cjs — a standalone render run
 
 ```bash
-... render.cjs deck.html [--out-dir <dir>] [--pptx] [--pdf] [--no-png]
+... render.cjs deck.html [--out-dir <dir>] [--pptx] [--pdf] [--no-png] [--force]
 ```
 
 `renderDeck` first builds a temp copy of the deck (expand-styles + asset
@@ -344,6 +352,9 @@ structure, the eyes decide taste.
 | `blank` / `maybe-blank` | no text and no media on the slide | delete the duplicate or fill it with content |
 | `broken-image` | the image failed to render | check the path, run `assets.cjs` |
 | `img-no-alt` | an `<img>` has no `alt` attribute | add alt text (empty `alt=""` for decoration) |
+| `decor-stamp` | the same element sits at the same coordinates on 3+ slides | look at the reference and decide: vary it (move/mirror/scale/bleed), swap it, or keep the repetition deliberately |
+| `decor-under-text` | decor overlaps text | judge in the render: keep it if intentional, otherwise bleed it off the edge or move it |
+| `stretched-image` | rendered aspect differs from the file's by >15% | set only `width` (height auto) or `object-fit: cover`; never width+height on a photo |
 | `hidden-slide` | the slide is `display:none` or zero-sized — the export engine skips it (a real deck lost 8 of 10 slides this way) | hide slides with `.active` only; never `display:none` |
 | `the deck uses none of the template assets` (lint) | the deck copies a style profile that has assets, but no `<img>` uses them | run `style-profile.cjs <pptx> --deploy <deck-dir>` and paste the `images/template-assets.md` snippets (`bg-img`/`logo`/`decor-img`) |
 | `uses an image background but the deck has none` (lint) | a copy left the background flat | add `<img class="bg-img" …>` on the slides that have it in the template |
@@ -406,7 +417,8 @@ turns on "Found multiple matches" while adding a background or a footer).
 `slide.cjs` replaces the Nth `<section>` exactly and leaves the rest of the
 file byte-identical; the fragment must be exactly one `<section>…</section>`
 (exit 3 otherwise). One slide per call; for a slide-wide change loop or rewrite
-the whole file in one write call.
+the whole file in one write call. `--list` is also the count check: the deck
+must have exactly the slides in the plan.
 
 ## lint-deck.cjs / assets.cjs
 
@@ -473,7 +485,8 @@ exits 2.
 One command for the whole loop: renders the deck, prints the paths of every
 `slide-NN.png` to LOOK at (the out-dir is cleaned first, so the list is always
 the current render — a reused dir used to show stale pictures from an older
-deck), lists probe issues, prints the structural read of every slide
+deck), lists probe issues, prints the STATIC LINT block (authored-file lint =
+the export gate) and the structural read of every slide
 (background layer, decor, blocks, fills, issues — the same text
 `inspect.cjs` prints), runs `validate.cjs` on the existing `.pptx` (skipped with
 `--no-validate`), optionally renders reference shots of a template, and prints

@@ -508,7 +508,10 @@
       push("text-overlap", `«${hit.a}» overlaps «${hit.b}» (${Math.round(hit.frac * 100)}% of the line box)`);
     }
 
-    // Graphic × text collisions (non-background images only).
+    // Graphic × text collisions (real content graphics only). Decor is NOT a
+    // blocker: templates layer art behind text and bleed it off the edge on
+    // purpose (bleeding is stylistically valid), so decor gets soft
+    // `decor-under-text` below instead.
     const textEls = [];
     for (const el of descendants) {
       if (!ownText(el)) continue;
@@ -516,26 +519,67 @@
       if (rect.width <= 1 || rect.height <= 1) continue;
       textEls.push({ el, rect });
     }
-    for (const img of Array.from(slide.querySelectorAll("img"))) {
-      const rect = img.getBoundingClientRect();
-      if (rect.width <= 8 || rect.height <= 8) continue;
-      if (!img.complete || img.naturalWidth === 0) continue;
-      if (slideArea > 0 && (rect.width * rect.height) / slideArea > 0.35) continue;
+    const overlapsText = (rect) => {
+      if (rect.width <= 8 || rect.height <= 8) return null;
       for (const t of textEls) {
-        if (t.el.contains(img) || img.contains(t.el)) continue;
         const ix = Math.min(t.rect.right, rect.right) - Math.max(t.rect.left, rect.left);
         const iy = Math.min(t.rect.bottom, rect.bottom) - Math.max(t.rect.top, rect.top);
         if (ix <= 0 || iy <= 0) continue;
         const minArea = Math.min(t.rect.width * t.rect.height, rect.width * rect.height);
-        if (minArea > 0 && (ix * iy) / minArea > 0.25) {
-          push(
-            "text-overlap",
-            `a ${Math.round(rect.width)}×${Math.round(rect.height)}px graphic collides with text ` +
-              excerpt(t.el, 40) +
-              " — move the decor to bleed off an edge (e.g. right:-90px; top:-120px), shrink it, or use a smaller decor; text must stay readable",
-          );
-          break;
-        }
+        if (minArea > 0 && (ix * iy) / minArea > 0.25) return t;
+      }
+      return null;
+    };
+    for (const img of Array.from(slide.querySelectorAll("img"))) {
+      if (img.closest(".decor, .decor-img, .cover-art, .bg-img, .logo")) continue;
+      const rect = img.getBoundingClientRect();
+      if (rect.width <= 8 || rect.height <= 8) continue;
+      if (!img.complete || img.naturalWidth === 0) continue;
+      if (slideArea > 0 && (rect.width * rect.height) / slideArea > 0.35) continue;
+      const t = overlapsText(rect);
+      if (t) {
+        push(
+          "text-overlap",
+          `a ${Math.round(rect.width)}×${Math.round(rect.height)}px graphic collides with text ` +
+            excerpt(t.el, 40) +
+            " — move the graphic to bleed off an edge (e.g. right:-90px; top:-120px), shrink it, or use a smaller element; text must stay readable",
+        );
+      }
+    }
+    // Decor over text: never blocks, but the eye misses it (a real copy put a
+    // squashed photo on top of the content). Judged in the render.
+    for (const decor of Array.from(slide.querySelectorAll(".decor-img, .decor"))) {
+      const dRect = decor.getBoundingClientRect();
+      if (dRect.width <= 8 || dRect.height <= 8) continue;
+      if (isFullSlide(dRect, slideRect)) continue;
+      const t = overlapsText(dRect);
+      if (t) {
+        const name = (decor.getAttribute("src") || "").split("/").pop() || decor.className || "decor";
+        push(
+          "decor-under-text",
+          `${name} overlaps ${excerpt(t.el, 36)} — check the render: keep it if the layering is intentional, otherwise bleed it off the edge (negative offsets are fine) or move it`,
+        );
+        break;
+      }
+    }
+    // A stretched image reads as an accident (a real copy squeezed a square
+    // photo into a 260×149 corner). Only width must be set; keep the aspect.
+    for (const img of Array.from(slide.querySelectorAll("img"))) {
+      if (img.closest(".bg-img")) continue; // backgrounds fill the slide by design
+      if (!img.complete || !img.naturalWidth || !img.naturalHeight) continue;
+      const fit = getComputedStyle(img).objectFit;
+      if (fit && fit !== "fill") continue; // cover/contain crop on purpose (e.g. .media img)
+      const r = img.getBoundingClientRect();
+      if (r.width < 8 || r.height < 8) continue;
+      const nat = img.naturalWidth / img.naturalHeight;
+      const ren = r.width / r.height;
+      if (nat > 0 && Math.abs(ren - nat) / nat > 0.15) {
+        push(
+          "stretched-image",
+          `${(img.getAttribute("src") || "").split("/").pop() || "image"} is stretched: natural ${img.naturalWidth}×${img.naturalHeight} → rendered ` +
+            `${Math.round(r.width)}×${Math.round(r.height)} — set only width (height auto) or object-fit: cover`,
+        );
+        break;
       }
     }
 
@@ -574,21 +618,34 @@
 
     // Rows inside a painted box must be separated by <br>: the exporter merges
     // all runs of a box into one <a:p>, so without <br> PowerPoint shows the
-    // title and the body on a single line.
+    // title and the body on a single line. The message names the exact pair
+    // and where the <br> goes: a real run added it AFTER the last row and
+    // looped on this error for four review cycles.
     const RUN_CLASSES = ["t-line", "t-title", "t-body", "t-cap"];
     for (const box of Array.from(slide.querySelectorAll(".card, .flow .node, .matrix .cell"))) {
+      const boxName = ["card", "node", "cell"].find((c) => box.classList.contains(c)) || "box";
       let prevRun = false;
+      let prevText = "";
       for (const kid of Array.from(box.children)) {
         if (kid.tagName === "BR") {
           prevRun = false;
+          prevText = "";
           continue;
         }
         const isRun = kid.classList && RUN_CLASSES.some((c) => kid.classList.contains(c));
+        const t = (kid.textContent || "").replace(/\s+/g, " ").trim().slice(0, 28);
         if (isRun && prevRun) {
-          push("missing-br", "two text rows in one box are not separated by <br> — in the .pptx they become a single line");
-          break;
+          push(
+            "missing-br",
+            `two rows in one .${boxName} are not separated by <br> («${prevText}» then «${t}») — ` +
+              `put <br> BETWEEN them: <span class="t-title">…</span><br><span class="t-body">…</span> ` +
+              `(raw <h3>/<p> inside a box are also a lint error — box text must be runs). ` +
+              `A <br> after the last row changes nothing`,
+          );
+          break; // one issue per box is enough
         }
         prevRun = isRun;
+        prevText = isRun ? t : "";
       }
     }
 
@@ -799,9 +856,27 @@
   function report() {
     const stageR = stageRect();
     const list = slides();
+    // Decor geometry is collected inside the measurable pass: outside it the
+    // non-active slides report zero-size rects.
+    const decorRects = [];
     const results = withAllSlidesMeasurable(() =>
       list.map((slide, i) => {
         try {
+          for (const el of Array.from(slide.querySelectorAll(".decor-img, .decor"))) {
+            const r = el.getBoundingClientRect();
+            if (r.width < 8 || r.height < 8) continue;
+            const bg = String(getComputedStyle(el).backgroundImage || "");
+            const m = bg.match(/url\(["']?([^"')]+)["']?\)/);
+            const src = el.getAttribute("src") || (m ? m[1] : "");
+            decorRects.push({
+              i,
+              name: (src.split("/").pop() || el.className || "decor").slice(0, 60),
+              x: Math.round(r.left / 8),
+              y: Math.round(r.top / 8),
+              w: Math.round(r.width / 8),
+              h: Math.round(r.height / 8),
+            });
+          }
           const res = checkSlide(slide, i, stageR);
           return { ...res, issues: (res.issues || []).map(withSeverity) };
         } catch (e) {
@@ -828,6 +903,28 @@
         withSeverity({
           type: "image-reuse",
           detail: `the same picture appears on ${idxs.length} slides (${idxs.map((i) => i + 1).join(", ")}) — one image = one meaning; vary the image or drop the repeats`,
+        }),
+      );
+    }
+    // Decor stamp: the same element at the same coordinates on 3+ slides reads
+    // as a template error, and a fast visual pass misses it (a real copy pasted
+    // one decor photo into the same corner of every slide, another one squashed
+    // onto the content). Bleeding off an edge is fine — repetition is not.
+    const decorGroups = new Map();
+    for (const d of decorRects) {
+      const key = `${d.name}|${d.x}|${d.y}|${d.w}x${d.h}`;
+      if (!decorGroups.has(key)) decorGroups.set(key, { name: d.name, slides: [] });
+      decorGroups.get(key).slides.push(d.i);
+    }
+    for (const [, g] of decorGroups) {
+      if (g.slides.length < 3) continue;
+      const last = g.slides[g.slides.length - 1];
+      results[last].issues.push(
+        withSeverity({
+          type: "decor-stamp",
+          detail:
+            `${g.name} sits at the same coordinates on slides ${g.slides.map((i) => i + 1).join(", ")} — check whether the repetition is intended: ` +
+            "the template varies its art per slide (move/mirror/scale/bleed it, or swap the element). Bleeding off an edge is fine",
         }),
       );
     }

@@ -304,7 +304,7 @@ function lintDeck(deckPath, opts = {}) {
   while ((um = classRe.exec(html))) {
     for (const token of um[2].split(/\s+/)) if (token) used.add(token);
   }
-  const ignored = new Set(["lucide"]);
+  const ignored = new Set(["lucide", "cover", "closing", "section", "quote"]); // role words used as classes in the skeleton
   let unknown = Array.from(used).filter((c) => !defined.has(c) && !ignored.has(c));
   const managedEmpty = /<style\b[^>]*\bdata-presentation-style=(["'])[^"']*\1[^>]*>\s*<\/style>/i.test(raw);
   if (managedEmpty) {

@@ -56,6 +56,24 @@ one click.
   on the slide background (outside filled boxes);
 - a box without fill/border (a plain column) may have block children.
 
+## Box variants — match the reference's look
+
+A template mixes several box styles (translucent vs solid fill, rounded vs
+square, outlined vs glow). Pick the form that matches what you saw:
+
+```html
+<div class="card">…runs…</div>          <!-- translucent main surface (--c-surface) -->
+<div class="card deep">…runs…</div>    <!-- darker runner-up fill (--c-surface-2) -->
+<div class="card ghost">…runs…</div>   <!-- outline only, transparent (keeps the border) -->
+<div class="card tint">…runs…</div>    <!-- translucent accent highlight (--c-accent-soft) -->
+<div class="card accent">…runs…</div>  <!-- solid accent: ONE short message per slide -->
+<div class="card inverse">…runs…</div> <!-- ink background, bg-colored text -->
+```
+
+Rows and lists are not cards: `.list` / `.table` (rows), `.steps` / `.flow`
+(process), `.kpi-row` (numbers), `.quote` (statement). Rendering every box as
+plain `.card` is the monotonous-copy failure a real deck was rejected for.
+
 ## Accent budget
 
 - every **content** slide carries at least one emphasis accent showing the eye

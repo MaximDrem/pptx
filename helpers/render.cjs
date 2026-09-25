@@ -188,6 +188,8 @@ function renderDeck(deckPath, opts = {}) {
   if (opts.pptx) args.push("--pptx");
   if (opts.pdf) args.push("--pdf");
   if (opts.noPng) args.push("--no-png");
+  // --force: the app exports despite blocking findings (loud warning).
+  if (opts.force) args.push("--allow-blocking");
 
   return new Promise((resolve) => {
     const cleanup = () => {
@@ -334,10 +336,20 @@ function renderDeck(deckPath, opts = {}) {
       // severity; the fallback set keeps older probes safe.
       const isBlocking = (i) => (i.severity ? i.severity === "error" : BLOCKING_TYPES.has(i.type));
       let effectiveCode = finalCode === 0 && !report ? 3 : finalCode;
+      // --force: the app already exported with a loud warning; keep the exit
+      // code deliverable but repeat what is still wrong, verbatim.
+      if (opts.force && report) {
+        const blockingN = (report.slides || []).reduce((n, s) => n + (s.issues || []).filter(isBlocking).length, 0);
+        if (blockingN > 0) {
+          console.error(
+            `render: WARNING — ${blockingN} blocking error(s) remain; the .pptx was delivered anyway (--force). Say exactly what is still wrong in the summary.`,
+          );
+        }
+      }
       // Blocking findings must be exit 4 even without --pptx/--pdf: index.cjs
       // documents 0 = clean, and an agent gating on $? was told "clean" while
       // the render was full of blocking errors.
-      if ((effectiveCode === 0 || effectiveCode === 3) && report) {
+      if (!opts.force && (effectiveCode === 0 || effectiveCode === 3) && report) {
         const blocking = (report.slides || []).reduce((n, s) => n + (s.issues || []).filter(isBlocking).length, 0);
         if (blocking > 0) {
           console.error(
@@ -390,13 +402,14 @@ async function main() {
   };
   const positional = argv.filter((a) => !a.startsWith("--") && a !== flag("--out-dir"));
   const deck = positional[0];
-  if (!deck) fail("usage: render.cjs <deck.html> [--out-dir <dir>] [--pptx] [--pdf] [--no-png]");
+  if (!deck) fail("usage: render.cjs <deck.html> [--out-dir <dir>] [--pptx] [--pdf] [--no-png] [--force]");
 
   const r = await renderDeck(deck, {
     outDir: flag("--out-dir"),
     pptx: argv.includes("--pptx"),
     pdf: argv.includes("--pdf"),
     noPng: argv.includes("--no-png"),
+    force: argv.includes("--force"),
   });
   if (!r.ran) {
     console.error("render: " + r.reason);

@@ -13,6 +13,12 @@ HTML and rebuild the .pptx.
 
 Each of these has already broken a real deck. They are not style advice.
 
+0. **Always answer in Russian.** No flexibility here: the whole answer, the
+   plan, the final summary and any question are in Russian, whatever language
+   this skill, the tool output or the model runs in. Slides are Russian too.
+   Never switch to English (a real run delivered a finished deck with an
+   English summary).
+
 1. **Only `helpers/index.cjs` builds the .pptx.**
    There is no python, no node, no npm and no network in this environment;
    `$GIGATOOL_NODE` is the only runtime and the helpers are the only builder.
@@ -48,7 +54,12 @@ Each of these has already broken a real deck. They are not style advice.
    is a **suggestion** (accents, spacing, emptiness, decor) — review them with
    your eyes, fix what genuinely improves the deck, mention the rest. Every
    content slide must have `elements > 0` and `coverage > 0` in
-   `inventory.json`. There is no "deliver anyway" for blocking errors.
+   `inventory.json`. **A gate stops the loop, not the delivery**: if the same
+   blocking error survives two honest repairs (or the runtime warns about
+   repeated calls), deliver anyway with `index.cjs deck.html --pptx --force` —
+   the .pptx is produced with a loud warning — and state exactly which defects
+   remain. A delivered deck with a known defect beats a stalled run with no
+   file.
 7. **Look before you copy, look before you deliver (vision).**
    When a template .pptx is attached, render its slides with
    `helpers/shots.cjs` and READ the images before extracting a style. The
@@ -96,7 +107,7 @@ Full helper list, report formats and diagnostics: `reference.md`.
 
 Before working, ask the user only what really changes the deck: topic/goal,
 audience, approximate length, must-have facts/numbers. Ask at most once, in the
-user's language; if the request already contains enough (an attached content
+Russian; if the request already contains enough (an attached content
 file, "make a presentation about X"), start without asking. **Format is never a
 question**: a presentation request always ends with a `.pptx` — never ask
 whether to make the pptx, which format, or whether to export. Do not start
@@ -144,11 +155,24 @@ Then, **in this order**:
 3. Note the palette by looking: dominant color, accent, whether the deck is
    dark or light. Compare with the extracted `tokens.css`; if they disagree,
    trust what you SEE and fix the tokens (bg/ink/accent) by hand.
-4. **Use the deployed template art** — this is what makes the copy recognizable
-   (skipping it is how a "copy" ends up with zero elements of the original):
-   `--deploy` copied the background/logo/decor into `images/` and wrote
-   `images/template-assets.md` with snippets and **placement hints** from the
-   template's own slides:
+4. **Look at the art yourself, then decide** — the copy is recognizable because
+   it reuses the template's own elements, not because a script placed them.
+   `--deploy` copies the art into `images/` and writes
+   `images/template-assets.md` with FACTS: the file, its size, and where each
+   element appears on the template's own slides (slide number, position,
+   rotation). The role words there (`decor`/`photo`/`icon`) are auto-guesses.
+   **Open the image files you consider** (you can view them like any PNG) and
+   answer in your own words:
+   - what is it? (blob/arrow/3D icon/photo of a person/laptop/screenshot/logo…)
+   - content or atmosphere? (a photo the slide is *about* vs an edge accent)
+   - does your slide need it at all?
+   Then look at the template shot of the slide that uses it and place it the
+   same way, adapted to your content. Do not stamp the same element at the same
+   coordinates on every slide — the template moves, mirrors, scales and bleeds
+   its art per slide. Bleeding off an edge is fine (negative offsets); art over
+   text, a squashed aspect or the same spot on 3+ slides show up as suggestions
+   (`decor-under-text`, `stretched-image`, `decor-stamp`) — decide in the
+   render. Technical forms:
    - `<img class="bg-img" src="images/template-bg-1.png" alt="">` as the FIRST child
      of **every slide that has a background in the template** — for corporate
      templates that is usually most content slides too, not only cover and
@@ -159,28 +183,27 @@ Then, **in this order**:
    - the profile already reproduces the template's content boxes: `--c-surface`
      holds the template's own card fill (usually a translucent white/black,
      e.g. `rgba(255,255,255,0.15)`), so plain `.card` looks native. The
-     manifest's **Box styles** section lists the runner-up fill too: alternate
-     `.card` / `.card.deep` / `.card.tint` / `.card.ghost` / `.card.inverse`
-     the way the template does — the same box on every slide is the
-     monotonous-copy failure (probe suggests `accent-cards` when overdone; a
-     solid `.card.accent` is for at most ONE short key message per slide);
+     manifest's **Box styles** lists the template's actual box looks (fill,
+     rounding, border, glow, slide numbers); patterns.md → **Box variants**
+     maps each look to its HTML form (`.card` / `.deep` / `.ghost` / `.tint` /
+     `.inverse`; rows/steps/numbers are separate patterns). Use the matching
+     form — the same box on every slide is the monotonous-copy failure;
    - `<img class="logo" …>` in the corner the manifest prints — corporate
      templates usually keep it TOP-LEFT, so paste `class="logo pos-tl"` and
      add `with-logo` to the slide class (it reserves the top band). A
      **Branding lockup** is a separate section: near-white brand art that goes
      where the template puts it (usually once, on the cover) — it is NOT
      decor: never repeat it and never place it over the logo;
-   - `<img class="decor-img" …>` for decor, photos and icons. The map's
-     coordinates are HINTS: the template never repeats decor at identical
-     coordinates — it stacks elements (a blob under an arrow), mirrors, scales
-     or bleeds them off an edge. Do the same: move/resize/pick another element
-     per slide, keep at least one template decor, and never let art cover text
-     (bleed it off an edge with negative offsets or swap it). Square photos in
-     the **Photo** section crop as circles (`class="decor-img round"`);
-   - the **Layout recipes** section lists what the template composes per slide
-     (background + art + boxes + title). Match the recipe to the section you
-     are building — a KPI row, a flow, a photo-led slide — instead of putting
-     every section on the same grid.
+   - a photo is content: prefer a `.media` block inside a pattern (or a
+     circular inset for a square portrait) and keep its aspect (set only
+     `width`); do not squeeze it into a corner;
+   - the **Layout recipes** section lists what the template composes per slide:
+     background + art + box looks + `connectors: N (arrows)` + `table R×C` +
+     title. Match the recipe to the section you are building — a KPI row, a
+     flow, a photo-led slide — instead of putting every section on the same
+     grid. Connectors/arrows become the `.flow`/`.steps` patterns (never a
+     pasted image), a table becomes `.table`, and a photo's crop/opacity fact
+     (when listed) tells you how the original framed it.
    If `template-assets.md` says the template has no reusable art (a flat
    token-only style), say so and move on.
 5. Build the deck with `data-presentation-style="profile:<slug>"`. Keep the
@@ -210,17 +233,33 @@ Typical arc: cover → context (1–2) → core (3–5) → plan/comparison → 
 with decisions. 15 minutes ≈ 10 slides. Every slide carries one idea; two ideas
 is two slides. Never duplicate texts between slides.
 
+Write the plan as a numbered list — one line per slide — BEFORE the HTML:
+`1. cover — …`, `2. kpi-row — …`, `3. split + photo — …`. The plan fixes the
+slide count (a "10 slides" request with 8 lines is already a shortfall) and the
+pattern per slide, so the deck does not collapse into one repeated grid.
+
 ### 3. Write deck.html
 
 Use the minimal skeleton (managed style line + your slides). Open
 `examples/example-deck.html` as a markup reference — but do NOT copy it
 wholesale: its working copy carries expanded CSS that you must not paste.
 
-**Write the whole deck in ONE write call** (all 8–14 slides at once). Do not
-assemble it slide-by-slide with edit calls — that is exactly how agents get
-stuck on "Found multiple matches for oldString" and burn the turn. The deck
-source is small (tens of KB): rewriting it completely is always cheaper than
-surgical inserts.
+**Write the whole deck in ONE write call for 8 slides or fewer** (all slides at
+once). Do not assemble it slide-by-slide with edit calls — that is exactly how
+agents get stuck on "Found multiple matches for oldString" and burn the turn.
+The deck source is small (tens of KB): rewriting it completely is always cheaper
+than surgical inserts.
+
+**For 9+ slides write in TWO passes**: first a complete deck with the cover and
+the first half (it must render), then append the rest with
+`slide.cjs deck.html --append --from /tmp/slide-N.html` (or `--from -`), one
+fragment per call. A real 10-slide request produced a 5-slide deck because the
+single huge write was truncated.
+
+**Count check before rendering**: `slide.cjs deck.html --list` must show exactly
+the number of lines in the plan. Fewer → append the missing slides first; the
+review header repeats the count, and a short deck is a failed deliverable even
+when every present slide is perfect.
 
 If the edit tool reports an ambiguous anchor (`Found multiple matches` /
 `Could not find oldString`) — **do not ask the user about tool mechanics** and
@@ -359,7 +398,7 @@ Markup rules:
   TEXT — no `http(s)://` URLs, no links: the deck is offline. An email
   address written as text is fine. `lint-deck` names the slide for every
   URL it finds;
-- write 8–14 slides in one pass; more — in two passes.
+- write 8 slides or fewer in one pass; 9+ in two passes (see §3).
 
 ### 4. Render loop (mandatory gate)
 
@@ -368,9 +407,11 @@ Markup rules:
 ```
 
 `review.cjs` renders the deck, prints every `slide-NN.png` to look at, lists
-the probe findings, runs the artifact validator if a .pptx already exists, and
-prints the review checklist. Findings are printed as `error:` (blocking — must
-be fixed) or `suggestion:` (taste — judge visually). It also prints a
+the probe findings, prints the STATIC LINT block (the same lint that gates the
+export, on the authored file), runs the artifact validator if a .pptx already
+exists, and prints the review checklist. Findings are printed as `error:`
+(blocking — must be fixed) or `suggestion:` (taste — judge visually). It also
+prints a
 **structural read** of every slide (background layer, decor with coordinates,
 blocks, fills, probe issues). Use it when a suggestion needs exact numbers;
 `inspect.cjs deck.html --slide N --detail` prints the same for one slide with
@@ -453,6 +494,9 @@ Per slide:
 
 Across the deck:
 
+- **completeness**: count the slides (`slide.cjs deck.html --list`): the deck
+  must match the plan line by line, closing/CTA included. A 10-slide request
+  that produced 5 is a failed deliverable even if the five look good;
 - **layout variety**: put your content slides side by side — if three or more
   are the same grid of boxes, change some to another pattern from `patterns.md`
   (split, flow, kpi-row, timeline, table, quote) or make one of them a picture
@@ -460,6 +504,14 @@ Across the deck:
 - **box variety**: in template mode the manifest's Box styles list several
   fills — if every card is the same surface, switch some to
   `.card.deep/.tint/.ghost`; the original template mixes them;
+- **art placement**: read the structural read's `decor:`/`images:` lines and
+  judge with your eyes: is the same element at the same coordinates on 3+
+  slides (`decor-stamp`)? Is a photo squashed (`stretched-image`)? Does art sit
+  on text (`decor-under-text`)? These are signals, not rules — move, mirror,
+  scale or bleed the element, swap it, or keep it deliberately (off-slide bleed
+  is stylistically fine). A real copy stamped a blob into one corner of every
+  slide and squashed the template's content photo (1079×1079) into 260×149; the
+  fix is your judgement from the reference shots, not a manifest recipe;
 - **template art**: in template mode, name the deployed element you used on the
   cover and on a content slide (the structural read's TEMPLATE ASSETS block
   shows what is where). If `template-decor-*` exists and appears nowhere, place
@@ -476,7 +528,7 @@ images, state it and deliver on `validate: clean` + `inspect.cjs` alone.
 
 Done means: the `.pptx` exists next to `deck.html` (plus `--pdf` only if the
 user asked) and `validate` is clean. Finish the turn with a short summary **in
-the user's language** — artifact path(s), slide count, style, and at most two
+Russian** — artifact path(s), slide count, style, and at most two
 things worth a human glance in PowerPoint (numbers, fonts). No questions, no
 "should I export?", no "would you like…": a presentation request is not
 finished until the .pptx is produced. A later "fix slide N" means edit
@@ -488,8 +540,7 @@ finished until the .pptx is produced. A later "fix slide N" means edit
   to proceed / make these changes / build the .pptx?" — the user asked for the
   deck, so you do the whole job (build → export → validate) in one turn and
   report the artifact path. Upfront content questions are fine; mid-work or
-  end-of-work approval is not. Answer the user in the user's language (slides
-  stay in the deck's language);
+  end-of-work approval is not. Answer in Russian (slides are Russian too);
 - never re-send the same issue list without a change: fix it and re-render, or
   rewrite the file. A failed edit tool call means the change did NOT land — do
   not re-run the pipeline as if it did; rewrite the file and verify the line is

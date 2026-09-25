@@ -2,7 +2,7 @@
 // presentation v2 — one-command deck pipeline:
 //
 //   ELECTRON_RUN_AS_NODE=1 "$GIGATOOL_NODE" "$HOME/.wsc/config/skills/presentation/helpers/index.cjs" \
-//     deck.html [--pptx] [--pdf] [--no-png] [--out-dir <dir>]
+//     deck.html [--pptx] [--pdf] [--no-png] [--out-dir <dir>] [--force]
 //
 //   1. lint-deck.cjs      static preflight on the authored deck (offline
 //                         contract, files, markup, template fidelity)
@@ -14,6 +14,10 @@
 //
 // Exit codes: 0 clean · 1 lint/assets/styles errors · 2 render failed to start ·
 // 3 render/export crashed · 4 blocking layout issues — export skipped.
+// --force is the last resort: after two honest fix attempts it exports despite
+// blocking findings (loud warning) so the user still gets a .pptx; state the
+// remaining defects in the summary. A delivered deck with a stated defect beats
+// a stalled run with no file.
 // Non-blocking issues do NOT fail the run: they are lines in stdout to fix.
 "use strict";
 
@@ -61,10 +65,15 @@ async function main() {
     try {
       execFileSync(process.execPath, [path.join(__dirname, "lint-deck.cjs"), absDeck], { stdio: "inherit", timeout: 120000 });
     } catch (e) {
-      console.error("index: lint-deck found blocking errors — fix them, then re-run this command");
-      console.error("index: per-slide fix: slide.cjs deck.html --get N > /tmp/slide-N.html; edit that fragment; slide.cjs deck.html --set N --from /tmp/slide-N.html");
-      console.error("index: do not re-run this exact command without changing deck.html — the same errors come back and the run stalls");
-      process.exit(1);
+      if (argv.includes("--force")) {
+        console.error("index: WARNING — continuing despite lint errors (--force); the .pptx is produced, state what is still wrong in the summary");
+      } else {
+        console.error("index: lint-deck found blocking errors — fix them, then re-run this command");
+        console.error("index: per-slide fix: slide.cjs deck.html --get N > /tmp/slide-N.html; edit that fragment; slide.cjs deck.html --set N --from /tmp/slide-N.html");
+        console.error("index: after two honest fix attempts deliver anyway: index.cjs deck.html --pptx --force (a stated defect beats no file)");
+        console.error("index: do not re-run this exact command without changing deck.html — the same errors come back and the run stalls");
+        process.exit(1);
+      }
     }
   }
 
@@ -73,6 +82,7 @@ async function main() {
     pptx: argv.includes("--pptx"),
     pdf: argv.includes("--pdf"),
     noPng: argv.includes("--no-png"),
+    force: argv.includes("--force"),
   });
   if (!r.ran) {
     console.error("index: render failed: " + r.reason);

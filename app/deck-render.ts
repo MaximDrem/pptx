@@ -70,6 +70,9 @@ export function runDeckRender(logger: Logger): void {
       pptx: process.argv.includes("--pptx"),
       pdf: process.argv.includes("--pdf"),
       png: !process.argv.includes("--no-png"),
+      // Escape hatch: deliver the .pptx even with blocking findings, with a
+      // loud warning. A deck with a stated defect beats no deck at all.
+      allowBlocking: process.argv.includes("--allow-blocking"),
     },
     logger,
   )
@@ -91,6 +94,7 @@ async function run(
     pptx: boolean
     pdf: boolean
     png: boolean
+    allowBlocking?: boolean
   },
   logger: Logger,
 ) {
@@ -315,10 +319,16 @@ async function run(
 
     if (opts.pptx || opts.pdf) {
       if (errorCount > 0) {
-        console.log(
-          `render: ${errorCount} blocking error(s), ${suggestionCount} suggestion(s) — export skipped. Fix deck.html and re-run; export only after a clean render.`,
-        )
-        exit(4)
+        if (opts.allowBlocking) {
+          console.log(
+            `render: WARNING — exporting with ${errorCount} blocking error(s) (--allow-blocking): the .pptx is produced, but the listed layout defects remain. Say exactly what is still wrong in the summary.`,
+          )
+        } else {
+          console.log(
+            `render: ${errorCount} blocking error(s), ${suggestionCount} suggestion(s) — export skipped. Fix deck.html and re-run; export only after a clean render.`,
+          )
+          exit(4)
+        }
       }
     }
 

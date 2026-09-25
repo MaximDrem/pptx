@@ -678,7 +678,16 @@ function parseTextBody(txBody, ctx) {
     lines.push({ ...props, runs });
   }
   text.paragraphs = lines;
-  text.plain = lines.map((l) => l.runs.map((r) => r.text).join("")).join("\n");
+  // `plain` is what analysis/rework reads: keep the bullet marker (buChar is
+  // formatting, so without this a bullet list came out as run-on lines).
+  text.plain = lines
+    .map((l) => {
+      const t = l.runs.map((r) => r.text).join("");
+      const marker = l.bullet && l.bullet.char ? l.bullet.char : null;
+      if (!marker || !t.trim() || t.startsWith(marker)) return t;
+      return `${marker} ${t}`;
+    })
+    .join("\n");
   return text;
 }
 
