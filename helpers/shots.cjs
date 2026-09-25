@@ -30,19 +30,38 @@ function usage() {
 
 function digest(deck, limit) {
   const lines = [];
+  const roleOf = new Map((deck.media || []).map((m) => [m.name, m.role || "picture"]));
   const n = Math.min(deck.slides.length, limit || deck.slides.length);
   for (let i = 0; i < n; i++) {
     const s = deck.slides[i];
     const texts = [];
     for (const el of s.elements) {
       if (el.text && el.text.plain && el.text.plain.trim()) texts.push(el.text.plain.trim());
-      if (texts.length >= 3) break;
+      if (texts.length >= 4) break;
     }
     const title = (texts[0] || "").replace(/\s+/g, " ").slice(0, 48);
     const bg = s.effectiveBg
       ? `${s.effectiveBg.type}${s.effectiveBg.media ? "(" + s.effectiveBg.media + ")" : ""}@${s.effectiveBgSource || "?"}`
       : "none";
     lines.push(`  slide ${String(i + 1).padStart(2, "0")}: «${title}» bg=${bg}`);
+    // What the eye sees besides text: pictures with role/size/position and the
+    // filled shapes (boxes). This is what tells a template's decor and layout
+    // variety apart from a wall of identical rectangles.
+    const pics = s.elements.filter((e) => e.kind === "picture" && e.media);
+    if (pics.length) {
+      const parts = pics.slice(0, 5).map((p) => {
+        const px = (p.box && p.box.px) || {};
+        const role = roleOf.get(p.media) || "picture";
+        return `${p.media}[${role}] ${px.w}×${px.h}@${px.x},${px.y}${px.rot ? " rot" + Math.round(px.rot) + "°" : ""}`;
+      });
+      lines.push(`    media: ${parts.join("; ")}${pics.length > 5 ? `; +${pics.length - 5} more` : ""}`);
+    }
+    const boxes = s.elements.filter((e) => e.kind === "shape" && e.fill && e.fill.type && e.fill.type !== "none");
+    if (boxes.length) {
+      const fills = [...new Set(boxes.map((b) => b.fill.hex).filter(Boolean))].slice(0, 4);
+      const texts3 = texts.slice(0, 3).map((t) => "«" + t.replace(/\s+/g, " ").slice(0, 28) + "»").join(", ");
+      lines.push(`    boxes: ${boxes.length} filled shape(s)${fills.length ? " (" + fills.join(", ") + ")" : ""}; texts: ${texts3}`);
+    }
   }
   return lines;
 }

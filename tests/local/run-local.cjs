@@ -58,7 +58,7 @@ async function main() {
 
   // 1b. Pure-node unit tests (no browser): pptx-post offset, artifact checks,
   //     render report/artifact contract.
-  for (const unit of ["pptx-post.test.cjs", "validate-checks.test.cjs", "render-report.test.cjs", "lint-deck.test.cjs", "expand-styles.test.cjs", "review.test.cjs", "helpers-contract.test.cjs"]) {
+  for (const unit of ["pptx-post.test.cjs", "validate-checks.test.cjs", "render-report.test.cjs", "lint-deck.test.cjs", "expand-styles.test.cjs", "review.test.cjs", "helpers-contract.test.cjs", "describe.test.cjs"]) {
     const u = spawnSync(process.execPath, [path.join(__dirname, "..", "unit", unit)], { encoding: "utf8", timeout: 60000 });
     const tail = ((u.stdout || "") + (u.stderr || "")).trim().split("\n").pop() || "";
     record(`unit ${unit}`, u.status === 0, tail.slice(0, 180));
@@ -142,6 +142,27 @@ async function main() {
     const merun = runHarness(["probe", meDeck]);
     const meout = (merun.stdout || "") + (merun.stderr || "");
     record("probe: пустой слайд ловится", /MOSTLY-EMPTY/.test(meout), meout.includes("MOSTLY-EMPTY") ? "ok" : "not reported");
+  }
+
+  // 2j. Structural read (inspect/describe): the model gets the same facts the
+  //     eye sees — background layer, blocks with fills — and no taste verdicts.
+  {
+    const moDeck = assemble("monotonous-body.html");
+    const moJson = path.join(path.dirname(moDeck), "probe.json");
+    runHarness(["probe", moDeck, "--json", moJson]);
+    let ok = false;
+    let detail = "no probe json";
+    if (fs.existsSync(moJson)) {
+      const { describeDeck } = require(path.join(SKILL, "helpers", "lib", "describe.cjs"));
+      const data = JSON.parse(fs.readFileSync(moJson, "utf8"));
+      const text = describeDeck({ report: data.report, inventory: data.inventory, deckName: "mono" }).join("\n");
+      const hasBg = /^deck mono: 7 slide\(s\)/m.test(text) && /bg:/.test(text);
+      const hasBlocks = /blocks: grid2 · 4 card\(s\)/.test(text);
+      const noTaste = !/repeated layout|same box fill|no visual anchor|generate 1–3|add a picture/i.test(text);
+      ok = hasBg && hasBlocks && noTaste;
+      detail = `bg=${hasBg}, blocks=${hasBlocks}, noTaste=${noTaste}`;
+    }
+    record("describe: структурный разбор реального рендера (фон/блоки/заливки)", ok, detail);
   }
 
   // 3. defect fixture: every issue type must fire.

@@ -885,9 +885,40 @@
           .trim()
           .slice(0, 500);
         const elements = [];
+        const layers = [];
+        const blocks = [];
         let decor = 0;
         let skipped = 0;
         const contentRects = [];
+
+        // Semantic extras for the text "vision" (lib/describe.cjs): class list,
+        // image src and the actual fill tell the model WHAT an element is
+        // (card/grid/decor/photo), not only its geometry. `blocks` keeps the
+        // containers (cards/grids/steps/decor) whose text lives in children.
+        const CLS_DROP = new Set(["slide", "active"]);
+        const BLOCK_RE = /\b(card|kpi-row|grid2|grid3|grid4|split|flow|timeline|table|steps|donut|matrix|funnel|quote|list|stat|step|chart|bars|hbars|icon-badge|icon|logo|decor-img|bg-img|cover-art|decor|media|pill|num)\b/;
+        const clsOf = (el) =>
+          el.classList
+            ? Array.from(el.classList)
+                .filter((c) => !CLS_DROP.has(c))
+                .join(" ")
+                .slice(0, 96)
+            : "";
+        const srcOf = (el) => (el.tagName === "IMG" ? (el.getAttribute("src") || "").slice(0, 120) : "");
+        const fillOf = (st) => {
+          const c = parseColor(st.backgroundColor);
+          if (c && c.a > 0.05) return rgbHex(c) + (c.a < 0.999 ? "@" + round1(c.a) : "");
+          if (st.backgroundImage && /gradient/.test(st.backgroundImage)) return "gradient";
+          return "";
+        };
+        const blockOf = (el, cls, st, g) => ({
+          cls,
+          src: srcOf(el),
+          fill: fillOf(st),
+          ...g,
+          kids: el.children.length,
+          text: excerpt(el, 56),
+        });
 
         for (const el of slide.querySelectorAll("*")) {
           if (!(el instanceof HTMLElement)) continue;
@@ -902,12 +933,37 @@
             parseFloat(st.borderTopWidth) > 0;
           const meaningful = hasText || media || el.dataset.role || el.dataset.pptx;
           const fullSlide = isFullSlide(rect, sr);
+          const cls = clsOf(el);
+          const geom = {
+            x: Math.round(rect.left - sr.left),
+            y: Math.round(rect.top - sr.top),
+            w: Math.round(rect.width),
+            h: Math.round(rect.height),
+          };
 
-          if (!meaningful) {
-            if (hasPaint && !fullSlide) decor++;
+          if (fullSlide) {
+            // Background layer: the model must know WHICH image/glow covers
+            // the slide — the old inventory kept only the flat bg color.
+            if (hasPaint || media || hasText) {
+              layers.push({
+                kind: media ? "image" : "paint",
+                cls,
+                src: srcOf(el),
+                fill: fillOf(st),
+                text: hasText ? excerpt(el, 48) : "",
+              });
+            }
             continue;
           }
-          if (fullSlide) continue; // background layer, reported at slide level
+          if (!meaningful) {
+            if (hasPaint) decor++;
+            // Layout containers (.grid2/.split/.kpi-row/…) have no own paint
+            // and no own text, but they are exactly what the structural read
+            // must name for a slide.
+            if (blocks.length < 30 && BLOCK_RE.test(cls)) blocks.push(blockOf(el, cls, st, geom));
+            continue;
+          }
+          if (BLOCK_RE.test(cls) && blocks.length < 30) blocks.push(blockOf(el, cls, st, geom));
           const chrome = inChrome(el);
           if ((hasText || media) && !chrome) contentRects.push(media ? rect : blockRectFor(el, slide, sr));
           if (elements.length >= 40) {
@@ -919,12 +975,12 @@
           const lh = Number.isFinite(lhRaw) && lhRaw > 0 ? round1(lhRaw / size) : 1.2;
           elements.push({
             tag: el.tagName.toLowerCase(),
+            cls,
+            src: srcOf(el),
+            fill: fillOf(st),
             role: chrome ? "footer" : el.dataset.role || el.dataset.pptx || "",
             text: hasText || media ? excerpt(el, 64) : "",
-            x: Math.round(rect.left - sr.left),
-            y: Math.round(rect.top - sr.top),
-            w: Math.round(rect.width),
-            h: Math.round(rect.height),
+            ...geom,
             font: firstFamily(st.fontFamily),
             size,
             weight: st.fontWeight,
@@ -949,11 +1005,13 @@
           stage: { w: Math.round(sr.width), h: Math.round(sr.height) },
           coverage,
           decor,
+          layers,
+          blocks,
           notes,
           elements,
         };
       } catch (e) {
-        return { index, role: "", bg: "", coverage: 0, decor: 0, notes: "", elements: [], error: String((e && e.message) || e) };
+        return { index, role: "", bg: "", coverage: 0, decor: 0, layers: [], blocks: [], notes: "", elements: [], error: String((e && e.message) || e) };
       }
       }),
     );

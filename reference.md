@@ -336,14 +336,33 @@ After the fixes — rerun; the goal is `render: clean`.
 
 ## inventory.json — eyes for pinpoint edits
 
-Format: `{ "slides": [{ "index", "role", "bg", "coverage", "decor", "notes",
-"elements": [{ "tag", "role", "text", "x", "y", "w", "h", "font", "size",
-"weight", "lh", "color", "lines", "ov" }] }] }`.
+Format: `{ "slides": [{ "index", "role", "bg", "coverage", "decor", "layers",
+"blocks", "notes", "elements": [{ "tag", "cls", "src", "fill", "role", "text",
+"x", "y", "w", "h", "font", "size", "weight", "lh", "color", "lines", "ov" }] }] }`.
 
 `coverage` — the share of height occupied by content (0..1); `decor` — the
-number of decorative fills; `ov` — overflow (`"+12v"`). Coordinates are in
-stage px. Make edits by element: find the needed `y` in inventory, change the
-markup, rerun the render.
+number of decorative fills; `ov` — overflow (`"+12v"`); `layers` — full-slide
+background/paint layers (`kind`, `cls`, `src`, `fill`); `blocks` — semantic
+containers (card/grid/stat/step/decor/chart/…) with class, fill, `src` and
+geometry; `elements` — text/media leaves with class, image `src` and computed
+`fill` (e.g. `#FFFFFF@0.15`). Coordinates are in stage px. Make edits by
+element: find the needed `y` in inventory, change the markup, rerun the render.
+To read this without parsing JSON, run `inspect.cjs` (below).
+
+## inspect.cjs — read the deck structure in text
+
+```bash
+... inspect.cjs deck.html [--slide N] [--detail] [--out-dir <dir>] [--png] [--json <path>]
+```
+
+`review.cjs` already prints this read; `inspect.cjs` is the standalone version
+(same render, no PNGs by default). For every slide it prints the real
+background layer, decor with position, headline/lead, pattern blocks, card
+fills, content band and probe issues; then a factual template-assets map (which
+deployed `images/template-*` file is used on which slide, which is not used,
+which content pictures exist). `--slide N --detail` adds per-block geometry
+(`@x,y W×H`, fill, src, text) — the DevTools view of one slide. If the renderer
+is unavailable it falls back to a static HTML outline instead of failing.
 
 ## lint-deck.cjs / assets.cjs
 
@@ -407,10 +426,12 @@ exits 2.
 ```
 
 One command for the whole loop: renders the deck, prints the paths of every
-`slide-NN.png` to LOOK at, lists probe issues, runs `validate.cjs` on the
-existing `.pptx` (skipped with `--no-validate`), optionally renders reference
-shots of a template, and prints the review checklist (style consistency,
-visual anchors, decor, template similarity, AI-slop signals).
+`slide-NN.png` to LOOK at, lists probe issues, prints the structural read of
+every slide (background layer, decor, blocks, fills, issues — the same text
+`inspect.cjs` prints), runs `validate.cjs` on the existing `.pptx` (skipped with
+`--no-validate`), optionally renders reference shots of a template, and prints
+the review checklist (style consistency, layout variety, visual anchors, decor,
+template similarity, AI-slop signals).
 
 The loop is: `review` → READ the PNGs (vision) → fix `deck.html` → `review`
 again, until `render: clean` AND the eyes agree; then `index.cjs --pptx` and
@@ -460,8 +481,9 @@ presentation/            ← this folder (installed as ~/.wsc/config/skills/pres
 │   ├── read-pptx.cjs    ├── style-profile.cjs ├── icons.cjs
 │   ├── shots.cjs        ← .pptx → per-slide PNGs for vision
 │   ├── review.cjs       ← render → look → fix loop driver (vision)
+│   ├── inspect.cjs      ← per-slide structural read (layers/blocks/fills/template map)
 │   ├── probe.js         ← injected into the render window
-│   └── lib/xml.cjs, lib/pptx.cjs
+│   └── lib/xml.cjs, lib/pptx.cjs, lib/describe.cjs
 ├── vendor/              ← jszip 3.10.1, dom-to-pptx 2.1.2 (MIT), licenses
 ├── examples/example-deck.html  ← reference deck (self-contained)
 ├── app/deck-render.ts   ← one-shot for desktop-ai-app (integration)

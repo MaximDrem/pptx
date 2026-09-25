@@ -13,7 +13,7 @@ BrowserWindow, which already exists in production for `--pptx-verify`.
 | From (this repository) | To (desktop-ai-app) |
 |---|---|
 | `presentation_v3/*` | `packages/desktop-electron/resources/defaults/skills/presentation/` (delete the folder and replace it entirely) |
-| `presentation_v3/.bundle-version` (= 53) | already inside the folder above |
+| `presentation_v3/.bundle-version` (= 54) | already inside the folder above |
 | `presentation_v3/app/deck-render.ts` | `src/main/deck-render.ts` |
 | the detector from `deck-render.ts` (`isRunDeckRender`) | `src/main/deck-render-check.ts` (mirroring `pptx-verify-check.ts`) |
 
@@ -24,7 +24,7 @@ cp -r /path/to/presentation_v3 packages/desktop-electron/resources/defaults/skil
 git add packages/desktop-electron/resources/defaults/skills/presentation
 ```
 
-Verify `.bundle-version` = `53` (the currently installed one = 35; when the
+Verify `.bundle-version` = `54` (the currently installed one = 35; when the
 number increases, `seed-defaults.ts` deletes the user's folder and re-seeds it
 entirely — the old skill rolls out by itself).
 
@@ -96,7 +96,7 @@ as in `--pptx-verify`.
 
 `presentation` is already in `versionStampedSkills` (the line exists in the
 current version) — no code change is needed, only the new
-`.bundle-version = 53`. If the line is actually missing, add it following the
+`.bundle-version = 54`. If the line is actually missing, add it following the
 neighboring skills.
 
 ### 2.5 Packaging
@@ -167,3 +167,16 @@ must keep it available in parallel with `--deck-render`. If it is ever
 removed, shots.cjs degrades to the `read-pptx.cjs --extract-media` fallback
 (exit 2, fallback instructions printed) — the skill keeps working, only the
 vision quality drops.
+
+## 8. v54 addition: structural read (no new app modes)
+
+`helpers/lib/describe.cjs` + `helpers/inspect.cjs` reuse the existing
+`--deck-render` report/inventory: the probe inventory now carries `layers`
+(full-slide background/paint), `blocks` (card/grid/stat/step/decor/chart with
+fill and geometry) and `cls`/`src`/`fill` per element, and the helpers print a
+per-slide structural read plus a factual `images/template-assets.md` usage map.
+No app change is required; the emitted report shape is backwards compatible
+(only additive keys). Design decisions — layout variety, pictures, decor
+placement — stay with the model's visual self-review (SKILL §6), not with
+lint gates: functional checks remain limited to objectively visible defects
+(clip/overlap/blank/broken).

@@ -290,6 +290,13 @@ Markup rules:
   icon, a chart, a photo or a big number. A deck of text-only cards reads as
   empty even when the text is there (probe: `sparse-box`, validate:
   `visual-scarcity`);
+- **vary the layout**: alternate patterns across slides (grid → split →
+  kpi-row → timeline → picture). Three or more content slides with the same box
+  grid read as "generated, not designed" — check this by eye in step 6;
+- **pictures**: 1–3 images generated with the chat image tool (e.g.
+  `gigachat_image`/`text2image`) on the cover or a key content slide are often
+  what a text-heavy deck is missing; place them per `patterns.md` (`.media`,
+  `.split`) and never reuse one file twice;
 - **box fill**: do not leave tall boxes half-empty (probe warns `sparse-box`);
 - colors/fonts/radii only via tokens `var(--…)`; hex in markup is forbidden;
 - charts — from `charts.md` (SVG/CSS, no libraries), numbers must be honest;
@@ -303,8 +310,9 @@ Markup rules:
   `styles/_base/icons.md` (one line per name). There is no `node` binary and
   no emoji — never draw your own paths;
 - images — local files referenced relatively (`<img src="images/...">` with
-  `alt`), generated ONLY with a chat tool (e.g. `gigachat_image`) before
-  assembling; template media — copied next to the deck and verified by looking
+  `alt`), generated ONLY with an image tool from your tool list (e.g.
+  `text2image`/`gigachat_image`) before assembling; template media — copied
+  next to the deck and verified by looking
   at them. **Never paste `data:` URIs into the deck**: the builder inlines
   styles and assets into a temp build copy, so the authored file stays small
   and editable (`index.cjs --inline` bakes them in only when a standalone
@@ -326,7 +334,11 @@ Markup rules:
 `review.cjs` renders the deck, prints every `slide-NN.png` to look at, lists
 the probe findings, runs the artifact validator if a .pptx already exists, and
 prints the review checklist. Findings are printed as `error:` (blocking — must
-be fixed) or `suggestion:` (taste — judge visually). The loop is:
+be fixed) or `suggestion:` (taste — judge visually). It also prints a
+**structural read** of every slide (background layer, decor with coordinates,
+blocks, fills, probe issues). Use it when a suggestion needs exact numbers;
+`inspect.cjs deck.html --slide N --detail` prints the same for one slide with
+block geometry. The loop is:
 
 1. **review** — run the command;
 2. **look** — READ every printed PNG (vision). For a 10-slide deck that is 10
@@ -360,8 +372,9 @@ unaccented quote slide) do not need fixing — but say in your reply which
 suggestions you left and why. Do not build the .pptx while errors remain: the
 tool refuses anyway (exit 4).
 
-If you cannot view images in this environment, say so explicitly and rely on
-the probe lines + `inventory.json` (`coverage` > 0 on every content slide).
+If you cannot view images in this environment, say so explicitly and use
+`inspect.cjs deck.html` — it prints what is on every slide (layers, decor,
+blocks, fills, empty band) so you can still reason structurally.
 
 ### 5. Export and validate
 
@@ -377,7 +390,7 @@ typography, placeholders, stage size, embedded fonts, notes,
 `decor-as-background`, `visual-scarcity` …). Loop until `validate: clean`;
 warnings must at least be mentioned to the user.
 
-### 6. Visual self-review, then deliver (vision)
+### 6. Visual self-review, then deliver (vision, required)
 
 The last gate — look at the EXPORTED deck, not the HTML:
 
@@ -385,11 +398,38 @@ The last gate — look at the EXPORTED deck, not the HTML:
 ... review.cjs deck.html --out-dir /tmp/deck-final [--reference "<template.pptx>"]
 ```
 
-READ the printed PNGs (in template mode also the reference shots) and answer
-the checklist honestly. Minimum: cover, one dense content slide, one light
-slide, closing. Compare with the reference shot of the same slide type. If
-something is off — fix the HTML and repeat steps 4–6. If you cannot view
-images, state it and deliver on `validate: clean` alone.
+READ the printed PNGs and answer honestly — first per slide, then the deck as a
+whole. In template mode also read the reference shots of the same slide kind.
+Look at them fresh: after staring at the markup you tend to see what you meant,
+not what rendered (if you have a subagent, hand it the PNG paths for a second
+opinion). This is YOUR judgment; the tools only measure (nothing below is a
+lint gate):
+
+Per slide:
+
+- is anything cut off, overlapping or touching the edges? aligned with its
+  neighbours? gaps even (not one huge empty band in one slide and cramped text
+  in another)? contrast readable (icons too, not only text)?
+- is there a visual anchor (photo, icon, chart, big number) or is it a wall of
+  text boxes?
+
+Across the deck:
+
+- **layout variety**: put your content slides side by side — if three or more
+  are the same grid of boxes, change some to another pattern from `patterns.md`
+  (split, flow, kpi-row, timeline, table, quote) or make one of them a picture
+  slide. A deck of identical squares is the #1 "generated, not designed" tell;
+- **template art**: in template mode, name the deployed element you used on the
+  cover and on a content slide (the structural read's TEMPLATE ASSETS block
+  shows what is where). If `template-decor-*` exists and appears nowhere, place
+  it on the cover/section/closing (bleed it off an edge if it collides);
+- **pictures**: if the deck has no photo and the topic allows one, generate 1–3
+  images with the chat image tool (e.g. `gigachat_image`/`text2image`) and use
+  them on the cover or a key content slide — a big picture is what makes a
+  text-heavy deck land. One image = one meaning; never reuse one file twice.
+
+If something is off — fix the HTML and repeat steps 4–6. If you cannot view
+images, state it and deliver on `validate: clean` + `inspect.cjs` alone.
 
 Delivery: short summary (what/how many slides/style/paths), ask the user to
 verify estimated numbers, and on "fix slide N" — edit `deck.html`, rebuild.

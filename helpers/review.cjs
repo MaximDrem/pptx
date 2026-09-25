@@ -15,6 +15,7 @@ const os = require("os");
 const path = require("path");
 const { execFileSync } = require("child_process");
 const { renderDeck } = require("./render.cjs");
+const { describeDeck } = require("./lib/describe.cjs");
 
 const CHECKLIST = [
   "1. Nothing clipped, overlapping or half-empty — compare with the probe lines above.",
@@ -91,6 +92,16 @@ async function main() {
   console.log(`render: ${issues.length ? issues.length + " issue(s)" : "clean"}`);
   for (const i of issues.slice(0, 20)) {
     console.log(`  slide ${i.slide}: ${i.type.toUpperCase()}: ${i.detail}`);
+  }
+
+  // Structural read: same facts the eye gets from the PNGs — background layer,
+  // decor position, block/fill inventory, empty band, repeated layouts, unused
+  // template art. This is what the model quotes when explaining what it saw.
+  if (r.inventory && r.inventory.length) {
+    console.log("\n=== WHAT IS ON EACH SLIDE (structural read) ===");
+    for (const line of describeDeck({ report: r.report, inventory: r.inventory, deckDir: path.dirname(deck), deckName: path.basename(deck) })) {
+      console.log(line);
+    }
   }
 
   if (flag("--reference")) {
