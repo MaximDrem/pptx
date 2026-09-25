@@ -35,6 +35,10 @@ async function main() {
     process.exit(2);
   }
   const absDeck = path.resolve(deck);
+  if (!require("fs").existsSync(absDeck)) {
+    console.error("index: deck not found: " + absDeck);
+    process.exit(2);
+  }
 
   // The authored deck stays untouched: expand-styles and asset inlining run on
   // a TEMP build copy inside renderDeck, so edits never fight data URIs.

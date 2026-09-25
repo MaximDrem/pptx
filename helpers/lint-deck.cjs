@@ -22,7 +22,11 @@ function lintDeck(deckPath, opts = {}) {
   const errors = [];
   const warnings = [];
   const file = path.resolve(deckPath);
-  if (!fs.existsSync(file)) return { errors: ["deck.html not found: " + file], warnings, slideCount: 0 };
+  if (!fs.existsSync(file)) {
+    const missing = ["deck.html not found: " + file];
+    if (!opts.quiet) for (const e of missing) console.error("error: " + e);
+    return { errors: missing, warnings, slideCount: 0 };
+  }
 
   const raw = fs.readFileSync(file, "utf8");
   const html = stripComments(raw);
@@ -138,7 +142,11 @@ function lintDeck(deckPath, opts = {}) {
     }
     const { found, tried } = resolveRef(deckDir, ref);
     if (!found) {
-      errors.push("missing local file: " + ref + " (looked at: " + tried.join(", ") + ")");
+      errors.push(
+        "missing local file: " + ref + " (looked at: " + tried.join(", ") + ") — " +
+          "if this is template art, use the EXACT file names from images/template-assets.md " +
+          "(they are already deployed by style-profile.cjs --deploy; never unpack the .pptx by hand)",
+      );
       continue;
     }
     // Local refs staying relative is the normal authored state — the builder
@@ -149,6 +157,15 @@ function lintDeck(deckPath, opts = {}) {
   // 4. Structure.
   const slideTags = raw.match(/<section\b[^>]*\bclass=(["'])[^"']*\bslide\b[^"']*\1[^>]*>/gi) || [];
   if (slideTags.length === 0) errors.push('no <section class="slide"> found — the deck must contain at least one slide');
+  // Malformed HTML (a slide missing its </section>) renders 0 slides and
+  // exit 3 — catch it here with a precise message instead of a render crash.
+  const openSections = (raw.match(/<section\b/gi) || []).length;
+  const closeSections = (raw.match(/<\/section>/gi) || []).length;
+  if (openSections !== closeSections) {
+    errors.push(
+      `unbalanced <section> tags: ${openSections} open vs ${closeSections} closed — the deck HTML is malformed and will render 0 slides; fix the missing/extra </section> (or rewrite the file)`,
+    );
+  }
   for (const tag of slideTags) {
     if (!/\bdata-role=/.test(tag)) warnings.push("slide without data-role (cover|section|content|quote|closing) — layout checks get weaker: " + tag.slice(0, 80));
   }
@@ -208,6 +225,13 @@ function main() {
   console.log("lint: clean (" + (r.slideCount || 0) + " slide(s), " + r.warnings.length + " warning(s))");
 }
 
-if (require.main === module) main();
+if (require.main === module) {
+  try {
+    main();
+  } catch (e) {
+    console.error("lint-deck: " + (e && e.message ? e.message : e));
+    process.exit(1);
+  }
+}
 
 module.exports = { lintDeck };

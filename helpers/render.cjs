@@ -102,8 +102,10 @@ function renderDeck(deckPath, opts = {}) {
         fs.mkdirSync(path.dirname(dest), { recursive: true });
         fs.copyFileSync(found, dest);
       }
-    } catch {
-      // best-effort: a missing ref is lint's job, not the builder's
+    } catch (e) {
+      // Best-effort, but never silent: a failed copy preflight would surface
+      // later as a confusing BROKEN-IMAGE in the render.
+      console.error("render: asset copy preflight failed: " + (e && e.message ? e.message : e));
     }
     require("./expand-styles.cjs").expandDeck(buildDeck);
     require("./assets.cjs").inlineAssets(buildDeck, { inline: true, quiet: true });
@@ -200,6 +202,12 @@ function renderDeck(deckPath, opts = {}) {
       // they are still useful when the export was blocked (exit 4).
       const report = readJson(path.join(outDir, "report.json"));
       const inventory = readJson(path.join(outDir, "inventory.json"));
+      if (finalCode !== 0 && !report) {
+        console.error(
+          "render: the deck produced no report — the HTML is likely malformed (an unclosed </section>) or throws at runtime; " +
+            "lint-deck reports unbalanced <section> tags — fix them or rewrite the whole file",
+        );
+      }
       // Only contract violations block the export. Probe issues carry a
       // severity; the fallback set keeps older probes safe.
       const BLOCKING = new Set([

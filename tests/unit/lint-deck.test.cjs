@@ -129,4 +129,16 @@ assert.ok(bypass.errors.length > 0, "GIGATOOL_DECK_LINT=0 must not disable lint 
   assert.ok(!fixed.errors.join("\n").includes("template profile"), "using bg + decor must clear the template errors");
 }
 
+// Malformed deck: an unclosed <section> must be a clear error, not a render crash.
+{
+  const bad = path.join(dir, "broken.deck.html");
+  fs.writeFileSync(
+    bad,
+    '<!doctype html><html><head><style>.slide { color: red; }</style></head><body><div class="deck-viewport"><div class="deck-stage" id="deck-stage">' +
+      '<section class="slide" data-role="content"><div class="slide-pad">без закрывающего тега</div></div></div></body></html>',
+  );
+  const res = lintDeck(bad, { quiet: true });
+  assert.ok(res.errors.join("\n").includes("unbalanced <section>"), "unclosed section must be an error");
+}
+
 console.log("PASS  lint-deck: //host и file: ловятся, bypass удалён, шаблонные ассеты обязательны");

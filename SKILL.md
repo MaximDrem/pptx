@@ -404,6 +404,13 @@ verify estimated numbers, and on "fix slide N" — edit `deck.html`, rebuild.
 - do not delete `deck.html` after export;
 - never tell the user to edit the deck by hand ("please fix the paths in the
   file") — fixing files is YOUR job; recover yourself (read → rewrite);
+- never unpack the .pptx or copy/rename its media by hand (no unzip/tar/shell
+  pipelines into `images/`): template art is already deployed by
+  `style-profile.cjs --deploy` — use the EXACT file names from
+  `images/template-assets.md`; extracting someone else's media is the job of
+  `read-pptx.cjs --extract-media` when the user asks for it;
+- never retry an identical tool call: if a call fails twice, change the
+  approach (read the exact lines, rewrite the whole file);
 - do not ask the user about editor/tool mechanics (ambiguous anchors, failed
   edits, formatting) — read the file and recover yourself: unique anchor or
   full rewrite.

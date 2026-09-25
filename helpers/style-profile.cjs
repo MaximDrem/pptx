@@ -632,7 +632,7 @@ function buildPrinciples(deck, colors, fonts) {
 
 if (require.main === module) {
   main().catch((e) => {
-    console.error(e.stack || String(e));
+    console.error("style-profile: " + (e && e.message ? e.message : e));
     process.exit(1);
   });
 }

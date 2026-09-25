@@ -124,6 +124,13 @@ function main() {
   }
 }
 
-if (require.main === module) main();
+if (require.main === module) {
+  try {
+    main();
+  } catch (e) {
+    console.error("styles: " + (e && e.message ? e.message : e));
+    process.exit(1);
+  }
+}
 
 module.exports = { expandDeck, expandInHtml, resolveTokens };

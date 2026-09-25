@@ -569,6 +569,27 @@ async function main() {
   let htmlIssues = 0;
   let htmlSlideCount = null;
 
+  // 0. Preflight: missing/misnamed local files are cheaper to report here
+  //    than as a BROKEN-IMAGE deep in the render (real case: a typo in a
+  //    template-bg path sent the model into unpacking the .pptx by hand).
+  if (/\.html?$/i.test(abs) && !argv.includes("--no-render")) {
+    try {
+      const { collectRefs, isData, isExternal, resolveRef } = require("./refs.cjs");
+      for (const { ref } of collectRefs(fs.readFileSync(abs, "utf8"))) {
+        if (isData(ref) || isExternal(ref)) continue;
+        const { found } = resolveRef(path.dirname(abs), ref);
+        if (!found) {
+          out.errors.push({
+            check: "missing-file",
+            detail: `«${ref}» not found next to the deck — check the spelling; template art must use the exact names from images/template-assets.md`,
+          });
+        }
+      }
+    } catch {
+      // best-effort preflight
+    }
+  }
+
   // 1. HTML-уровень: рендер и probe-отчёт. renderDeck returns the parsed
   //    report even when the temp dir was removed, so the probe findings are
   //    never dropped (they used to be read from an already-deleted file).

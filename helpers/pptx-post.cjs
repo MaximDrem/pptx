@@ -80,6 +80,10 @@ async function main() {
     process.exit(2);
   }
   const abs = path.resolve(file);
+  if (!fs.existsSync(abs)) {
+    console.error("pptx-post: file not found: " + abs);
+    process.exit(1);
+  }
   const { buffer, fixed, details } = await fixLineSpacing(fs.readFileSync(abs));
   fs.writeFileSync(abs, buffer);
   console.log(`pptx-post: ${fixed} line-spacing value(s) exact → proportional in ${path.basename(abs)}`);
@@ -88,7 +92,7 @@ async function main() {
 
 if (require.main === module) {
   main().catch((e) => {
-    console.error(e.stack || String(e));
+    console.error("pptx-post: " + (e && e.message ? e.message : e));
     process.exit(1);
   });
 }
