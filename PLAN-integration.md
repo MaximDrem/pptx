@@ -13,7 +13,7 @@ BrowserWindow, which already exists in production for `--pptx-verify`.
 | From (this repository) | To (desktop-ai-app) |
 |---|---|
 | `presentation_v3/*` | `packages/desktop-electron/resources/defaults/skills/presentation/` (delete the folder and replace it entirely) |
-| `presentation_v3/.bundle-version` (= 55) | already inside the folder above |
+| `presentation_v3/.bundle-version` (= 57) | already inside the folder above |
 | `presentation_v3/app/deck-render.ts` | `src/main/deck-render.ts` |
 | the detector from `deck-render.ts` (`isRunDeckRender`) | `src/main/deck-render-check.ts` (mirroring `pptx-verify-check.ts`) |
 
@@ -24,7 +24,7 @@ cp -r /path/to/presentation_v3 packages/desktop-electron/resources/defaults/skil
 git add packages/desktop-electron/resources/defaults/skills/presentation
 ```
 
-Verify `.bundle-version` = `55` (the currently installed one = 35; when the
+Verify `.bundle-version` = `57` (the currently installed one = 35; when the
 number increases, `seed-defaults.ts` deletes the user's folder and re-seeds it
 entirely — the old skill rolls out by itself).
 
@@ -96,7 +96,7 @@ as in `--pptx-verify`.
 
 `presentation` is already in `versionStampedSkills` (the line exists in the
 current version) — no code change is needed, only the new
-`.bundle-version = 55`. If the line is actually missing, add it following the
+`.bundle-version = 57`. If the line is actually missing, add it following the
 neighboring skills.
 
 ### 2.5 Packaging
@@ -193,3 +193,50 @@ per-slide `Layout recipes` map; placement slide numbers are 1-based (they used
 to be off by one). `lint-deck.cjs` errors on raw `<h3>/<p>/<ul>` inside pattern
 boxes (one-box rule), so a fallback to raw HTML inside `.card` is caught as a
 static error. Report/inventory shapes are untouched; no app change.
+
+## 10. v56 addition: completion contract (no permission questions)
+
+SKILL.md used to end with "ask the user to verify estimated numbers", which a
+real run turned into an English "should I make the pptx?" question. The
+delivery section now defines done (the .pptx exists next to deck.html and
+`validate` is clean), forbids export/approval questions and English replies to
+Russian users, and adds two editing guards: a failed edit means the change did
+not land (never re-run the pipeline on it), and a slide-wide rename is one
+`replaceAll` edit (or a full rewrite), not N disambiguation attempts. No code
+change.
+
+## 11. Release checklist — the version file IS the ship status
+
+The seeder compares `.bundle-version` and re-seeds only when the shipped number
+is HIGHER than the installed one. Editing skill files without bumping it ships
+nothing: users keep running the old instructions. Real incident: the app repo
+carried the new helpers but `.bundle-version` stayed at 41, so a run still had
+the old SKILL.md line "ask the user to verify estimated numbers" and the agent
+asked whether to build the pptx. When syncing `presentation_v3/` into the app
+repo:
+
+1. copy **every** file including the hidden `.bundle-version` (it is tracked;
+   do not exclude it from the copy). Use a sync that EXCLUDES `.git` — both
+   folders are git working trees, and `cp -a src/. dst/` will overwrite the
+   destination's HEAD/refs/index with the stale clone's metadata:
+   `rsync -a --delete --exclude .git presentation_v3/ presentation_v3_git/pptx/`
+   (fallback without rsync:
+   `find presentation_v3 -mindepth 1 -maxdepth 1 ! -name .git -exec cp -a {} presentation_v3_git/pptx/ \;`);
+2. verify the tracked value matches the source:
+   `git show HEAD:.bundle-version` vs `cat presentation_v3/.bundle-version`;
+3. `git status --short` must list only the intended release files (content +
+   `.bundle-version`) — commit them together; an uncommitted working tree ships
+   nothing either.
+
+## 12. v57 addition: slide.cjs + no hand-off contract
+
+`helpers/slide.cjs` (new) does per-slide `--list/--get/--set/--append` by
+replacing the Nth `<section>…</section>` with zero string matching, because
+deck.html repeats the slide/logo/decor markup and the edit tool's `oldString`
+failed on real runs (multiple matches / not found). SKILL §3 routes per-slide
+changes through it (get fragment → edit → set), keeps "a failed edit means the
+change is not in the file", and the hard bans explicitly forbid ending the task
+by telling the user how to edit the HTML (a real run answered «вам потребуется
+вручную добавить фон…» instead of finishing). The lint background-coverage
+error now counts slides that actually have a background and names the required
+number + asset class instead of leaking profile counters. No app change.

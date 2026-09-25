@@ -116,7 +116,7 @@ assert.ok(bypass.errors.length > 0, "GIGATOOL_DECK_LINT=0 must not disable lint 
     fs.writeFileSync(deck, sparse);
     const sparseRes = lintDeck(deck, { quiet: true });
     assert.ok(
-      sparseRes.errors.join("\n").includes("backgrounds on cover/closing only"),
+      sparseRes.errors.join("\n").includes("flat slides read as a different deck"),
       "backgrounds missing on most slides must be an error",
     );
   }

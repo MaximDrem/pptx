@@ -100,13 +100,15 @@ function lintDeck(deckPath, opts = {}) {
       );
     }
     if (hasBg && imageBgTemplate >= Math.max(2, templateSlides * 0.4)) {
-      const deckSlides = (raw.match(/<section\b[^>]*\bclass=(["'])[^"']*\bslide(?![\w-])/g) || []).length;
-      const bgUses = (raw.match(/class=(["'])[^"']*\bbg-img\b/g) || []).length;
-      if (deckSlides > 0 && bgUses < Math.ceil(deckSlides * 0.5)) {
+      const slideBodies = raw.match(/<section\b[\s\S]*?<\/section>/gi) || [];
+      const withBg = slideBodies.filter((b) => /class=(["'])[^"']*\bbg-img\b/.test(b) || /background-image\s*:/.test(b)).length;
+      const need = Math.ceil(slideBodies.length * 0.5);
+      if (slideBodies.length > 0 && withBg < need) {
         errors.push(
-          `template profile «${profileMatch[2].trim()}» paints image backgrounds on most slides (${imageBgTemplate} of ${templateSlides} in the template), ` +
-            `but the deck has only ${bgUses} background layer(s) for ${deckSlides} slides — backgrounds on cover/closing only read as a different deck. ` +
-            `Add .bg-img to every slide that has one in the template (see images/template-assets.md)`,
+          `template profile «${profileMatch[2].trim()}» uses image backgrounds on its slides, but the deck has a background on only ${withBg} of ${slideBodies.length} — flat slides read as a different deck. ` +
+            `Put a background on at least ${need} slides: <img class="bg-img" src="images/template-bg-N…" alt=""> as the first child of the slide ` +
+            `(images/template-assets.md says which background belongs to which slide type; use one or two ` +
+            `different backgrounds instead of a flat fill)`,
         );
       }
     }

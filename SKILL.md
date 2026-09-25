@@ -95,9 +95,12 @@ Full helper list, report formats and diagnostics: `reference.md`.
 | "in the style of <saved>" | profile from `~/.wsc/config/styles/` |
 
 Before working, ask the user only what really changes the deck: topic/goal,
-audience, approximate length, must-have facts/numbers, deadline (if they ask
-for "15 minutes" — that's 8–10 slides). Do not start laying out before you
-understand the goal and the length.
+audience, approximate length, must-have facts/numbers. Ask at most once, in the
+user's language; if the request already contains enough (an attached content
+file, "make a presentation about X"), start without asking. **Format is never a
+question**: a presentation request always ends with a `.pptx` — never ask
+whether to make the pptx, which format, or whether to export. Do not start
+laying out before you understand the goal and the length.
 
 ### 1A. Pick a built-in style
 
@@ -219,37 +222,46 @@ stuck on "Found multiple matches for oldString" and burn the turn. The deck
 source is small (tens of KB): rewriting it completely is always cheaper than
 surgical inserts.
 
-If an edit tool still reports an ambiguous anchor — **do not ask the user
-about tool mechanics, recover yourself**:
+If the edit tool reports an ambiguous anchor (`Found multiple matches` /
+`Could not find oldString`) — **do not ask the user about tool mechanics** and
+do not retry with a bigger context. The markup repeats on every slide, so the
+edit tool is the wrong instrument here; recover with `slide.cjs`:
 
-1. read `deck.html` (it is small);
-2. either anchor on something unique — the footer of the previous slide
-   (`<div class="footer"><span>Section</span><span>NN</span></div>` — the
-   numbering exists exactly for this) — or
-3. rewrite the whole file in one write call with the missing slides added.
+1. `slide.cjs deck.html --get N` — prints slide N's exact `<section>…</section>`;
+2. edit that fragment with the write tool (it is one slide);
+3. `slide.cjs deck.html --set N --from /tmp/slide-N.html` — puts it back,
+   the rest of the file stays byte-identical;
+4. or rewrite the whole file in one write call.
 
 Never leave a half-built deck behind: "continue later" means the next call
 rewrites the complete file.
 
-**Editing later** (a second pass, or "fix slide N"):
+**Editing later** (a second pass, or "fix slide N") — use `slide.cjs`, not the
+edit tool:
 
-- read `deck.html` first: it stays small — images are relative `images/…`
-  paths and styles live in the managed block, so a fresh Read gives exact
-  anchors (never retype big fragments from memory);
-- **the repeating-markup trap**: the slide opening, logo and decor lines are
-  IDENTICAL on every slide, so an anchor that is not the slide's own text
-  matches 3–10 places and the edit fails. Always anchor on the unique
-  headline/footer of the slide you mean;
-- anchor on a whole element (opening + closing tag) — never on a bare
-  `</section>`;
-- **never invent asset names**: list `images/` or read
+```bash
+... slide.cjs deck.html --list                     # index / role / headline per slide
+... slide.cjs deck.html --get 3                    # print slide 3's <section>
+#   write the corrected fragment → /tmp/slide-3.html, then:
+... slide.cjs deck.html --set 3 --from /tmp/slide-3.html
+... slide.cjs deck.html --append --from /tmp/slide-11.html
+```
+
+Why: the slide opening, logo and decor markup are IDENTICAL on every slide, so
+the edit tool's `oldString` is ambiguous by design — real runs burned turns on
+"Found multiple matches" while adding a background or a footer. `slide.cjs`
+replaces the Nth `<section>` exactly (no matching at all). Rules:
+
+- one slide per `--set` call; for a slide-wide change (all backgrounds, all
+  footers) either loop over slides or rewrite the whole file in one write;
+- a failed edit means the change is NOT in the file — never re-run the pipeline
+  as if it landed;
+- **never invent asset names**: run `slide.cjs --list`/list `images/` or read
   `images/template-assets.md` before referencing `template-*` — a guessed
   `template-bg.png` instead of `template-bg-1.png` fails lint/assets and
   wastes a render cycle;
-- **after the FIRST failed edit, stop editing surgically**: re-read the file
-  and rewrite it completely in one write call (it is tens of KB). A second
-  "bigger context" attempt is how turns get burned. Never ask the user about
-  edit mechanics.
+- if you get stuck on mechanics, rewrite the complete `deck.html` in ONE write
+  call — that always works. Never hand the user steps to edit the file.
 
 ```html
 <!doctype html>
@@ -452,16 +464,26 @@ Across the deck:
 If something is off — fix the HTML and repeat steps 4–6. If you cannot view
 images, state it and deliver on `validate: clean` + `inspect.cjs` alone.
 
-Delivery: short summary (what/how many slides/style/paths), ask the user to
-verify estimated numbers, and on "fix slide N" — edit `deck.html`, rebuild.
+Done means: the `.pptx` exists next to `deck.html` (plus `--pdf` only if the
+user asked) and `validate` is clean. Finish the turn with a short summary **in
+the user's language** — artifact path(s), slide count, style, and at most two
+things worth a human glance in PowerPoint (numbers, fonts). No questions, no
+"should I export?", no "would you like…": a presentation request is not
+finished until the .pptx is produced. A later "fix slide N" means edit
+`deck.html`, rebuild, validate.
 
 ## Hard bans
 
-- **no permission questions**: never "Would you like me to proceed / make these
-  changes?" — the user asked for the deck, so you do the whole job to the end
-  in one turn (upfront content questions are fine; mid-work approval is not).
-  Never re-send the same issue list without a change: fix it and re-render, or
-  rewrite the file;
+- **no permission questions, no "should I export?"**: never "Would you like me
+  to proceed / make these changes / build the .pptx?" — the user asked for the
+  deck, so you do the whole job (build → export → validate) in one turn and
+  report the artifact path. Upfront content questions are fine; mid-work or
+  end-of-work approval is not. Answer the user in the user's language (slides
+  stay in the deck's language);
+- never re-send the same issue list without a change: fix it and re-render, or
+  rewrite the file. A failed edit tool call means the change did NOT land — do
+  not re-run the pipeline as if it did; rewrite the file and verify the line is
+  present;
 - no `.ts/.js/.py` decks or build scripts in the result, no npm/pip/curl;
 - no chat tools from HTML or helpers;
 - no emoji, external URLs, CDNs;
@@ -475,8 +497,11 @@ verify estimated numbers, and on "fix slide N" — edit `deck.html`, rebuild.
   is a failed copy;
 - do not "fix" overflow by shrinking the font;
 - do not delete `deck.html` after export;
-- never tell the user to edit the deck by hand ("please fix the paths in the
-  file") — fixing files is YOUR job; recover yourself (read → rewrite);
+- **never hand the job to the user**: no "add this to the HTML", "you will need
+  to insert…", "the next step is for you to…". Fixing files is YOUR job —
+  `slide.cjs --set N` or one full write call always works. A final message that
+  instructs the user how to edit the deck is a failed task, even if it is
+  polite and detailed;
 - never unpack the .pptx or copy/rename its media by hand (no unzip/tar/shell
   pipelines into `images/`): template art is already deployed by
   `style-profile.cjs --deploy` — use the EXACT file names from

@@ -22,6 +22,7 @@ density).
 | Style profile | extracted from `ГигаКот` (dark theme, background from pixels `#002A3A`, assets by role), `Сводка почты` (dark), `hybrid-work` (light) | ✅ |
 | Template extraction (v55) | `style-profile.cjs --deploy`: cover-first backgrounds (label `(cover)`), near-white lockups as branding ≠ decor, up to 6 decors + 2 photos + 4 icons per template, placements with rotation, Box styles (runner-up fill → `--c-surface-2`/`.card.deep`), per-slide Layout recipes; slide numbers are 1-based | ✅ |
 | Editing guards (v55) | lint errors on raw `<h3>/<p>/<ul>` inside pattern boxes (one-box rule); SKILL spells out the repeating-markup anchor trap, "first failed edit → full rewrite", and "never invent asset names (read `template-assets.md`)" | ✅ |
+| Slide edits (v57) | `slide.cjs --list/--get/--set/--append` replaces the Nth `<section>…</section>` without `oldString` (the repeated slide/logo/decor markup made edit anchors ambiguous by design — real runs looped on "Found multiple matches"); SKILL routes per-slide changes through it and bans handing edit steps to the user | ✅ |
 | Media roles (auto) | background/logo/decor/icon/photo/graphic from geometry and usage + `visual` (avgColor, dark, hasAlpha) — verified on ГигаКот | ✅ |
 | Text styles | font/size/color with the inheritance chain (run → endPara → defRPr → lstStyle → layout/master placeholders → txStyles → default), `hl=` (highlight), `on=` (background under text) | ✅ |
 | Box+text merging | `single-box` regression: run boxes → one PowerPoint shape, block children → not | ✅ |

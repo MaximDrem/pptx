@@ -28,6 +28,7 @@ const CLI = [
   "validate.cjs",
   "review.cjs",
   "inspect.cjs",
+  "slide.cjs",
   "shots.cjs",
   "read-pptx.cjs",
   "style-profile.cjs",

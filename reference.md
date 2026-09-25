@@ -387,6 +387,23 @@ which content pictures exist). `--slide N --detail` adds per-block geometry
 (`@x,y W×H`, fill, src, text) — the DevTools view of one slide. If the renderer
 is unavailable it falls back to a static HTML outline instead of failing.
 
+## slide.cjs — per-slide edits without oldString
+
+```bash
+... slide.cjs deck.html --list                    # index / role / headline / size
+... slide.cjs deck.html --get 3                   # exact <section>…</section> of slide 3
+... slide.cjs deck.html --set 3 --from /tmp/slide-3.html
+... slide.cjs deck.html --append --from /tmp/slide-11.html
+```
+
+`deck.html` repeats the slide opening, logo and decor markup on every slide, so
+the generic edit tool's `oldString` is ambiguous by design (real runs burned
+turns on "Found multiple matches" while adding a background or a footer).
+`slide.cjs` replaces the Nth `<section>` exactly and leaves the rest of the
+file byte-identical; the fragment must be exactly one `<section>…</section>`
+(exit 3 otherwise). One slide per call; for a slide-wide change loop or rewrite
+the whole file in one write call.
+
 ## lint-deck.cjs / assets.cjs
 
 ```bash
@@ -480,7 +497,7 @@ so an unreviewed dirty deck cannot slip through.
 | `warn NO-ACCENT` | a content slide has nothing accented | highlight the key block (patterns.md, "Accent budget") |
 | `warn SPARSE-BOX` | a tall box is nearly empty | shorten the box or add substance |
 | `probe: N issue(s)` | see the type table | fix one by one, rerender |
-| `Found multiple matches for oldString` (edit tool) | building the deck slide-by-slide with repeated anchors | do not ask the user: read `deck.html`, anchor on the previous slide's footer (`<span>NN</span>`) or rewrite the whole file in one write call |
+| `Found multiple matches for oldString` / `Could not find oldString` (edit tool) | the slide opening, logo and decor markup repeat on every slide — the edit tool's `oldString` is ambiguous by design | switch to `slide.cjs`: `--get N` → edit the fragment → `--set N --from file` (or `--append`); a full rewrite in one write call also works. Never retry with more context and never re-run the pipeline on a failed edit |
 
 ## Skill files
 
@@ -506,6 +523,7 @@ presentation/            ← this folder (installed as ~/.wsc/config/skills/pres
 │   ├── shots.cjs        ← .pptx → per-slide PNGs for vision
 │   ├── review.cjs       ← render → look → fix loop driver (vision)
 │   ├── inspect.cjs      ← per-slide structural read (layers/blocks/fills/template map)
+│   ├── slide.cjs        ← per-slide get/set/append without oldString
 │   ├── probe.js         ← injected into the render window
 │   └── lib/xml.cjs, lib/pptx.cjs, lib/describe.cjs
 ├── vendor/              ← jszip 3.10.1, dom-to-pptx 2.1.2 (MIT), licenses
