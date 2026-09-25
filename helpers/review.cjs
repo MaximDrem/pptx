@@ -4,18 +4,24 @@
 //   node review.cjs <deck.html> [--reference <template.pptx>] [--out-dir <dir>] [--no-validate]
 //
 // One command for the whole look-and-fix loop: renders the deck, prints the
-// paths of the slide PNGs to LOOK at (vision), lists probe issues, runs the
-// artifact validator (if a .pptx exists) and prints the review checklist.
-// The loop is: review → look → fix → review … until render is clean AND the
-// eyes say OK, then export.
+// paths of the slide PNGs to LOOK at (only the captures of THIS render — the
+// out-dir is cleaned first), lists probe issues with their severity, prints the
+// structural read, runs the artifact validator (if a .pptx newer than
+// deck.html exists) and prints the review checklist.
+//
+// Exit: 0 clean · 4 blocking findings (fix, then re-run) · 2 render could not
+// start · 3 render failed/no report. The loop is: review → look → fix → review
+// … until render is clean AND the eyes say OK, then export.
 "use strict";
 
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { execFileSync } = require("child_process");
-const { renderDeck } = require("./render.cjs");
+const { renderDeck, BLOCKING_TYPES } = require("./render.cjs");
 const { describeDeck } = require("./lib/describe.cjs");
+
+const VALUE_FLAGS = new Set(["--out-dir", "--reference"]);
 
 const CHECKLIST = [
   "1. Nothing clipped, overlapping or half-empty — compare with the probe lines above.",
@@ -34,8 +40,10 @@ function listPngs(dir) {
   try {
     return fs
       .readdirSync(dir)
-      .filter((f) => /^slide-\d+\.png$/i.test(f))
-      .sort();
+      .map((f) => ({ f, n: Number((/^slide-(\d+)\.png$/i.exec(f) || [])[1]) }))
+      .filter((x) => Number.isFinite(x.n))
+      .sort((a, b) => a.n - b.n)
+      .map((x) => x.f);
   } catch {
     return [];
   }
@@ -47,7 +55,7 @@ async function main() {
     const i = argv.indexOf(name);
     return i === -1 ? undefined : argv[i + 1];
   };
-  const deckArg = argv.find((a, i) => !a.startsWith("--") && (i === 0 || !argv[i - 1].startsWith("--")));
+  const deckArg = argv.find((a, i) => !a.startsWith("--") && !(i > 0 && VALUE_FLAGS.has(argv[i - 1])));
   if (!deckArg) {
     console.error("usage: review.cjs <deck.html> [--reference <template.pptx>] [--out-dir <dir>] [--no-validate]");
     process.exit(2);
@@ -81,10 +89,20 @@ async function main() {
     console.error("review: render failed: " + r.reason);
     process.exit(2);
   }
-  const pngs = listPngs(outDir);
-  const issues = (r.report && r.report.slides ? r.report.slides : []).flatMap((s) =>
-    (s.issues || []).map((i) => ({ slide: s.index + 1, type: i.type, detail: i.detail })),
+  const report = Array.isArray(r.report) ? r.report : r.report && Array.isArray(r.report.slides) ? r.report.slides : null;
+  if (!report) {
+    // A crash mid-capture can leave a few PNGs from the failed attempt: they
+    // are not the deck, do not let the model reason from them.
+    console.error(`review: render FAILED (exit ${r.code ?? "?"}) — no report.json${r.reason ? " (" + r.reason + ")" : ""}`);
+    console.error("review: do not act on partial pictures above; fix the HTML (slide.cjs --get N → edit → --set N, or one full rewrite), then run review once.");
+    process.exit(r.code && r.code > 0 ? r.code : 3);
+  }
+  const issues = report.flatMap((s) =>
+    (s.issues || []).map((i) => ({ slide: s.index + 1, type: i.type, detail: i.detail, severity: i.severity })),
   );
+  const isBlocking = (i) => (i.severity ? i.severity === "error" : BLOCKING_TYPES.has(i.type));
+  const blocking = issues.filter(isBlocking);
+  const pngs = listPngs(outDir);
 
   console.log("=== LOOK AT THESE (vision) ===");
   if (pngs.length) {
@@ -92,17 +110,28 @@ async function main() {
   } else {
     console.log("  (no PNGs — was the render blocked?)");
   }
-  console.log(`render: ${issues.length ? issues.length + " issue(s)" : "clean"}`);
+  console.log(
+    `render: ${issues.length ? issues.length + " issue(s)" : "clean"}` +
+      (blocking.length ? ` — ${blocking.length} BLOCKING` : "") +
+      (issues.length - blocking.length ? `, ${issues.length - blocking.length} suggestion(s)` : ""),
+  );
   for (const i of issues.slice(0, 20)) {
-    console.log(`  slide ${i.slide}: ${i.type.toUpperCase()}: ${i.detail}`);
+    console.log(`  slide ${i.slide}: ${isBlocking(i) ? "error" : "suggestion"}: ${i.type.toUpperCase()}: ${i.detail}`);
+  }
+  if (blocking.length) {
+    console.log(
+      `\nACTION: fix the ${blocking.length} blocking error(s) above in deck.html ` +
+        `(slide.cjs deck.html --get N → edit the fragment → slide.cjs deck.html --set N --from /tmp/slide-N.html; ` +
+        `or rewrite the whole file in ONE write call), then run review once. ` +
+        `Do not re-run review without changing deck.html — the same errors come back and the run stalls.`,
+    );
   }
 
   // Structural read: same facts the eye gets from the PNGs — background layer,
-  // decor position, block/fill inventory, empty band, repeated layouts, unused
-  // template art. This is what the model quotes when explaining what it saw.
-  if (r.inventory && r.inventory.length) {
+  // decor position, block/fill inventory, empty band, unused template art.
+  if (Array.isArray(r.inventory) && r.inventory.length) {
     console.log("\n=== WHAT IS ON EACH SLIDE (structural read) ===");
-    for (const line of describeDeck({ report: r.report, inventory: r.inventory, deckDir: path.dirname(deck), deckName: path.basename(deck) })) {
+    for (const line of describeDeck({ report, inventory: r.inventory, deckDir: path.dirname(deck), deckName: path.basename(deck) })) {
       console.log(line);
     }
   }
@@ -122,15 +151,25 @@ async function main() {
   }
 
   if (!argv.includes("--no-validate")) {
-    const pptx = flag("--pptx") || deck.replace(/\.html?$/i, ".pptx");
+    const pptx = deck.replace(/\.html?$/i, ".pptx");
     console.log("\n=== VALIDATE ===");
     if (fs.existsSync(pptx)) {
+      // Only validate an artifact built from THIS deck.html: a stale .pptx is
+      // worse than none (the model thinks the current HTML was checked).
+      let stale = false;
       try {
-        const v = execFileSync(process.execPath, [path.join(__dirname, "validate.cjs"), pptx], { encoding: "utf8" });
-        console.log(v.trim().split("\n").slice(-4).join("\n"));
-      } catch (e) {
-        const v = String(e.stdout || "").trim();
-        console.log(v ? v.split("\n").slice(-8).join("\n") : "validate failed: " + (e.message || e));
+        stale = fs.statSync(pptx).mtimeMs < fs.statSync(deck).mtimeMs;
+      } catch {}
+      if (stale) {
+        console.log("the .pptx next to the deck is OLDER than deck.html — rebuild with index.cjs deck.html --pptx before validating");
+      } else {
+        try {
+          const v = execFileSync(process.execPath, [path.join(__dirname, "validate.cjs"), pptx], { encoding: "utf8" });
+          console.log(v.trim().split("\n").slice(-4).join("\n"));
+        } catch (e) {
+          const v = String(e.stdout || "").trim();
+          console.log(v ? v.split("\n").slice(-8).join("\n") : "validate failed: " + (e.message || e));
+        }
       }
     } else {
       console.log("no .pptx yet — run index.cjs deck.html --pptx after the render is clean");
@@ -140,6 +179,7 @@ async function main() {
   console.log("\n=== CHECKLIST (answer honestly, fix, repeat) ===");
   for (const line of CHECKLIST) console.log("  " + line);
   console.log(`\nreview dir: ${outDir}`);
+  process.exit(blocking.length ? 4 : 0);
 }
 
 main().catch((e) => {

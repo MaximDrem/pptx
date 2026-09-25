@@ -15,8 +15,63 @@ const path = require("path");
 const { isData, isExternal, resolveRef, collectRefs } = require("./refs.cjs");
 
 const SESSION_TOOL_RE = /(?<![.\w])(gigachat_image|text2image|generate_image|image_generation|web_search|websearch)\s*\(/g;
+const SKILL_DIR = path.join(__dirname, "..");
+
+// Classes defined by the canonical CSS (stage + base + all built-in tokens +
+// fonts). An authored deck with only the empty managed block has no other
+// source of classes, so unknown names are typos/missing pastes — the check
+// used to be skipped exactly in that (normal) case.
+let canonicalClasses = null;
+function loadCanonicalClasses() {
+  if (canonicalClasses) return canonicalClasses;
+  const set = new Set();
+  const files = [path.join(SKILL_DIR, "stage.css"), path.join(SKILL_DIR, "fonts", "fonts.css"), path.join(SKILL_DIR, "styles", "_base.css")];
+  try {
+    for (const d of fs.readdirSync(path.join(SKILL_DIR, "styles"), { withFileTypes: true })) {
+      if (d.isDirectory()) files.push(path.join(SKILL_DIR, "styles", d.name, "tokens.css"));
+    }
+  } catch {
+    // styles/ missing — nothing canonical to compare
+  }
+  for (const f of files) {
+    try {
+      const css = fs.readFileSync(f, "utf8");
+      let m;
+      const re = /\.(-?[A-Za-z_][\w-]*)/g;
+      while ((m = re.exec(css))) set.add(m[1]);
+    } catch {
+      // skip unreadable file
+    }
+  }
+  canonicalClasses = set;
+  return set;
+}
 
 const stripComments = (html) => html.replace(/<!--[\s\S]*?-->/g, "").replace(/\/\*[\s\S]*?\*\//g, "");
+
+// Inner HTML of every element carrying `class="… boxClass …"`, depth-aware for
+// nested same-tag elements (a plain lazy regex stopped at the first </div> and
+// missed raw <h3>/<p> hidden behind a .card-stack/.n wrapper).
+function boxInners(html, boxClass) {
+  const out = [];
+  const openRe = new RegExp(`<([a-z][a-z0-9]*)\\b[^>]*\\bclass=(["'])[^"']*\\b${boxClass}\\b[^"']*\\2[^>]*>`, "gi");
+  let m;
+  while ((m = openRe.exec(html))) {
+    const tag = m[1];
+    const start = m.index + m[0].length;
+    const tagRe = new RegExp(`</?${tag}\\b[^>]*>`, "gi");
+    tagRe.lastIndex = start;
+    let depth = 1;
+    let t;
+    while ((t = tagRe.exec(html))) {
+      if (t[0][1] === "/") depth--;
+      else depth++;
+      if (depth === 0) break;
+    }
+    out.push(html.slice(start, t ? t.index : html.length));
+  }
+  return out;
+}
 
 function lintDeck(deckPath, opts = {}) {
   const errors = [];
@@ -87,15 +142,16 @@ function lintDeck(deckPath, opts = {}) {
     if (hasDecor && !usesDecor) {
       errors.push(
         `template profile «${profileMatch[2].trim()}» has decor assets but the deck uses none — the copy loses the original's recognisable elements. ` +
-          `Place at least one deployed decor anywhere sensible (class="decor-img", see images/template-assets.md for hints); ` +
-          `position, size and the choice of decor are yours`,
+          `Place at least one deployed decor anywhere sensible, e.g. ` +
+          `<img class="decor-img" style="left:1080px; top:-80px; width:260px" src="images/template-decor-1.png" alt=""> ` +
+          `(exact names in images/template-assets.md; position, size and the choice of decor are yours)`,
       );
     }
     const usesBg = /class=(["'])[^"']*\bbg-img\b/.test(raw) || /background-image\s*:/.test(raw);
     if (hasBg && !usesBg) {
       errors.push(
         `template profile «${profileMatch[2].trim()}» uses an image background but the deck has none — a flat fill is not a style copy. ` +
-          `Add <img class="bg-img" src="images/template-bg…" alt=""> as the first child of the slides that have it in the template ` +
+          `Add <img class="bg-img" src="images/template-bg-1.png" alt=""> as the first child of the slides that have it in the template ` +
           `(or set background-image yourself); use a token background only if the template is flat`,
       );
     }
@@ -205,20 +261,23 @@ function lintDeck(deckPath, opts = {}) {
     // + <br>), never raw <h3>/<p>/<ul>. Block tags split the box into extra
     // text shapes and lose the box style on export (real case: the model fell
     // back to raw HTML inside .card and the copy stopped looking like the
-    // template).
-    const boxRe = /<(div|article|li)\b[^>]*\bclass=(["'])[^"']*\b(card|kpi|pill|stat|step|quote)\b[^"']*\2[^>]*>([\s\S]*?)<\/\1>/gi;
-    let box;
-    while ((box = boxRe.exec(body))) {
-      const rawTag = /<(h[1-6]|p|ul|ol)\b/i.exec(box[4]);
-      if (rawTag) {
+    // template). The scan is depth-aware: a `.card-stack`/`.n` wrapper inside
+    // the box must not hide the raw tags behind the first `</div>`.
+    for (const boxClass of ["card", "kpi", "pill", "stat", "cell"]) {
+      for (const inner of boxInners(body, boxClass)) {
+        const rawTag = /<(h[1-6]|p|ul|ol)\b/i.exec(inner);
+        if (!rawTag) continue;
         errors.push(
-          `slide ${secIndex}: raw <${rawTag[1].toLowerCase()}> inside .${box[3]} — box text must be runs (.t-title/.t-body/.t-cap, <b>, <br>), nothing else in the box (export merge + style; patterns.md → One-box rule)`,
+          `slide ${secIndex}: raw <${rawTag[1].toLowerCase()}> inside .${boxClass} — box text must be runs (.t-title/.t-body/.t-cap, <b>, <br>), nothing else in the box (export merge + style; patterns.md → One-box rule). ` +
+            `Replace it: <${rawTag[1].toLowerCase()}>text</${rawTag[1].toLowerCase()}> → <span class="${/^h[1-6]$/.test(rawTag[1].toLowerCase()) ? "t-title" : "t-body"}">text</span>; rows are separated by <br>, not by block tags`,
         );
         break;
       }
     }
     if (!/class=(["'])[^"']*\bfooter\b/.test(body)) {
-      warnings.push(`slide ${secIndex}: no .footer — the numbering/anchor is lost (add <div class="footer">…</div>)`);
+      warnings.push(
+        `slide ${secIndex}: no .footer — the numbering/anchor is lost (add <div class="footer"><span>Раздел</span><span>${String(secIndex).padStart(2, "0")}</span></div> as the last child of .slide-pad)`,
+      );
     }
   }
   if (!/deck-stage/.test(raw) || !/deck-viewport/.test(raw)) {
@@ -246,14 +305,15 @@ function lintDeck(deckPath, opts = {}) {
     for (const token of um[2].split(/\s+/)) if (token) used.add(token);
   }
   const ignored = new Set(["lucide"]);
-  const unknown = Array.from(used).filter((c) => !defined.has(c) && !ignored.has(c));
+  let unknown = Array.from(used).filter((c) => !defined.has(c) && !ignored.has(c));
   const managedEmpty = /<style\b[^>]*\bdata-presentation-style=(["'])[^"']*\1[^>]*>\s*<\/style>/i.test(raw);
-  // An empty managed block is the NORMAL state of the authored deck: the
-  // builder expands it into a temp copy, so the class check understands that
-  // the base classes are defined (nothing to warn about).
-  if (!managedEmpty && unknown.length && styleBlocks.length) {
+  if (managedEmpty) {
+    const canon = loadCanonicalClasses();
+    unknown = unknown.filter((c) => !canon.has(c));
+  }
+  if (unknown.length && (styleBlocks.length || managedEmpty)) {
     warnings.push(
-      "class(es) used but not defined in the deck's <style> (silent fallback — typo or missing paste): " +
+      "class(es) used but not defined in the deck's <style> or the canonical CSS (silent fallback — typo or missing paste): " +
         unknown.slice(0, 12).join(", ") +
         (unknown.length > 12 ? ` … +${unknown.length - 12}` : ""),
     );

@@ -558,13 +558,17 @@ async function main() {
     const i = argv.indexOf(name);
     return i === -1 ? undefined : argv[i + 1];
   };
-  const positional = argv.filter((a, i) => !a.startsWith("--") && (i === 0 || !argv[i - 1].startsWith("--") || argv[i - 1] === undefined));
+  const positional = argv.filter((a, i) => !a.startsWith("--") && !(i > 0 && ["--pptx", "--out-dir", "--json"].includes(argv[i - 1])));
   const input = positional[0] || flag("--pptx");
   if (!input) {
     console.error("usage: validate.cjs <deck.html|deck.pptx> [--pptx <file>] [--out-dir <dir>] [--no-render] [--json <path>]");
     process.exit(2);
   }
   const abs = path.resolve(input);
+  if (!fs.existsSync(abs)) {
+    console.error("validate: input not found: " + abs);
+    process.exit(2);
+  }
   const out = { errors: [], warnings: [], info: [] };
   let htmlIssues = 0;
   let htmlSlideCount = null;

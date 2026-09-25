@@ -227,7 +227,13 @@ function parseTemplateAssets(md) {
         ? "logo"
         : /^decor/i.test(head)
           ? "decor"
-          : null;
+          : /^photo/i.test(head)
+            ? "photo"
+            : /^icon/i.test(head)
+              ? "icon"
+              : /^branding/i.test(head)
+                ? "brand"
+                : null;
     if (!kind) continue;
     const file = (/src="images\/([^"]+)"/.exec(chunk) || [])[1];
     if (!file) continue;

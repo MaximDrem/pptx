@@ -58,7 +58,7 @@ function main() {
   assert.ok(out.includes("=== LOOK AT THESE (vision) ==="), "must print the vision header");
   assert.ok(out.includes(path.join(outDir, "slide-01.png")) && out.includes(path.join(outDir, "slide-02.png")), "must list both slide PNGs");
   assert.ok(/render: 1 issue\(s\)/.test(out), "must report the issue count");
-  assert.ok(out.includes("slide 1: NO-ACCENT"), "must list probe issues with slide numbers");
+  assert.ok(/slide 1: (suggestion|error): NO-ACCENT|slide 1: NO-ACCENT/.test(out), "must list probe issues with slide numbers");
   assert.ok(out.includes("no .pptx yet"), "without a .pptx it must point at index.cjs --pptx");
   assert.ok(out.includes("=== CHECKLIST"), "must print the review checklist");
   assert.ok(out.includes("template") || out.includes("Template"), "checklist must mention template comparison");

@@ -107,6 +107,16 @@ async function main() {
   if (env.GIGATOOL_APP_PATH) args.push(env.GIGATOOL_APP_PATH);
   args.push("--pptx-verify", abs, "--out-dir", outDir);
 
+  // A reused --out-dir (review's reference dir) may hold slide PNGs from a
+  // previous, bigger deck: the list and the digest must describe THIS pptx.
+  try {
+    for (const f of fs.readdirSync(outDir)) {
+      if (/^slide-\d+\.png$/i.test(f)) fs.unlinkSync(path.join(outDir, f));
+    }
+  } catch {
+    // no dir yet — the renderer will create it
+  }
+
   const child = spawn(binary, args, { env, stdio: ["ignore", "inherit", "inherit"] });
   const timeoutMs = Number(process.env.PRESENTATION_RENDER_TIMEOUT_MS || 300000);
   const timer = setTimeout(() => {
@@ -121,7 +131,7 @@ async function main() {
   });
   child.on("exit", (code) => {
     clearTimeout(timer);
-    const pngs = fs.existsSync(outDir) ? fs.readdirSync(outDir).filter((f) => /\.png$/i.test(f)).sort() : [];
+    const pngs = fs.existsSync(outDir) ? fs.readdirSync(outDir).filter((f) => /^slide-\d+\.png$/i.test(f)).sort() : [];
     if (!pngs.length) {
       console.error(`shots: the renderer produced no PNGs (exit ${code}).`);
       console.error("fallback: read-pptx.cjs " + JSON.stringify(abs) + " --extract-media /tmp/tpl-media");

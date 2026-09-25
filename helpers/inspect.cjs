@@ -34,13 +34,14 @@ const strip = (s) => String(s || "").replace(/<[^>]*>/g, "").replace(/\s+/g, " "
 const base = (s) => String(s || "").split(/[\\/]/).pop();
 
 // Static outline: works without a browser, so the model is never left blind.
-function staticOutline(html) {
+function staticOutline(html, slide) {
   const lines = [];
   const re = /<section\b([^>]*)>([\s\S]*?)<\/section>/gi;
   let m;
   let n = 0;
   while ((m = re.exec(html))) {
     n++;
+    if (slide && Number(slide) !== n) continue;
     const attrs = m[1];
     const body = m[2];
     const role = (/(?:^|\s)data-role=(["'])([^"']+)\1/.exec(attrs) || [])[2] || "content";
@@ -55,6 +56,7 @@ function staticOutline(html) {
     lines.push(`slide ${n} [${role}]${headline ? " «" + headline.slice(0, 72) + "»" : ""}`);
     lines.push(`  static: patterns ${patterns.join("+") || "none"} · img ${imgs} · svg ${svgs} · assets ${srcs.join(", ") || "none"}`);
   }
+  if (!lines.length && slide) lines.push(`slide ${slide}: not found (deck has ${n})`);
   return lines;
 }
 
@@ -80,7 +82,7 @@ async function main() {
     const i = argv.indexOf(name);
     return i === -1 ? undefined : argv[i + 1];
   };
-  const deckArg = argv.find((a, i) => !a.startsWith("--") && (i === 0 || !argv[i - 1].startsWith("--")));
+  const deckArg = argv.find((a, i) => !a.startsWith("--") && !(i > 0 && ["--slide", "--out-dir", "--json"].includes(argv[i - 1])));
   if (!deckArg) usage();
   const deck = path.resolve(deckArg);
   if (!fs.existsSync(deck)) {
@@ -92,16 +94,28 @@ async function main() {
   const detail = argv.includes("--detail") || !!slide;
 
   if (argv.includes("--no-render")) {
-    console.log("render: skipped (--no-render) — static outline only");
-    console.log(staticOutline(html).join("\n"));
+    console.log(`render: skipped (--no-render) — static outline only${slide ? `, slide ${slide}` : ""}`);
+    const lines = staticOutline(html, slide);
+    console.log(lines.join("\n"));
+    if (flag("--json")) {
+      const file = path.resolve(flag("--json"));
+      fs.writeFileSync(file, JSON.stringify({ deck, digest: lines }, null, 2));
+      console.log("inspect json: " + file);
+    }
     return;
   }
 
   const outDir = flag("--out-dir");
   const r = await renderDeck(deck, { outDir, noPng: !argv.includes("--png") });
-  if (!r.ran) {
-    console.log("render: unavailable (" + r.reason + ") — static outline only");
-    console.log(staticOutline(html).join("\n"));
+  if (!r.ran || !r.report) {
+    console.log(`render: unavailable (${r.reason || `exit ${r.code}`}) — static outline only`);
+    const lines = staticOutline(html, slide);
+    console.log(lines.join("\n"));
+    if (flag("--json")) {
+      const file = path.resolve(flag("--json"));
+      fs.writeFileSync(file, JSON.stringify({ deck, digest: lines }, null, 2));
+      console.log("inspect json: " + file);
+    }
     return;
   }
   if (r.outDir) console.log("render dir: " + r.outDir + (argv.includes("--png") ? " (slide-NN.png captured)" : ""));

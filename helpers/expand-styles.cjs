@@ -105,13 +105,34 @@ function expandDeck(file) {
 }
 
 function main() {
-  const args = process.argv.slice(2).filter((a) => !a.startsWith("--"));
-  const file = args[0];
+  const argv = process.argv.slice(2);
+  const file = argv.find((a) => !a.startsWith("--"));
   if (!file) {
-    console.error("usage: expand-styles.cjs <deck.html>");
+    console.error("usage: expand-styles.cjs <deck.html> [--write]");
+    console.error("  without --write it only reports what would change; the pipeline expands the build copy itself");
     process.exit(2);
   }
+  const write = argv.includes("--write") || argv.includes("--inline");
   try {
+    if (!write) {
+      // Safe default: the authored deck is the model's live document, an
+      // unconditional in-place expansion used to surprise edits with 300KB of
+      // new CSS. Report and stop.
+      const abs = path.resolve(file);
+      if (!fs.existsSync(abs)) throw new Error("deck not found: " + abs);
+      const html = fs.readFileSync(abs, "utf8");
+      const m = /<style\b[^>]*\bdata-presentation-style=(["'])([^"']*)\1[^>]*>/i.exec(html);
+      if (!m) {
+        console.log("styles: no managed style block — nothing to expand");
+        return;
+      }
+      const out = expandInHtml(html, resolveTokens(m[2]));
+      console.log(
+        `styles: would expand "${resolveTokens(m[2]).label}" into ${path.basename(abs)} (+${Math.round((out.html.length - html.length) / 1024)}KB); ` +
+          "re-run with --write to apply (the pipeline expands a build copy on its own)",
+      );
+      return;
+    }
     const r = expandDeck(file);
     if (!r.expanded) {
       console.log("styles: no managed style block (deck.css already inlined) — nothing to expand");

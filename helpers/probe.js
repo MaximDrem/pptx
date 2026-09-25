@@ -491,7 +491,13 @@
         if (fg !== null && bgs && bgs.length) {
           const worst = Math.min.apply(null, bgs.map((b) => contrast(fg, b)));
           if (worst < NEARLY_INVISIBLE) {
-            push("low-contrast", excerpt(el, 60) + ` has insufficient contrast against its background (ratio ${worst.toFixed(1)}:1 < ${NEARLY_INVISIBLE}, WCAG AA large text)`);
+            const fgHex = colorHex(getComputedStyle(el).color) || "?";
+            push(
+              "low-contrast",
+              `${excerpt(el, 60)} — contrast ${worst.toFixed(1)}:1 < ${NEARLY_INVISIBLE}:1 (text ${fgHex} blends into its backdrop). ` +
+                "Fix the COLOR, not the weight: body → var(--c-ink); small/caption text → var(--c-ink) or a stronger muted; " +
+                "accent-colored text only on a dark surface; on a light slide wrap the text in .card.deep/.card.inverse or use ink",
+            );
           }
         }
       }

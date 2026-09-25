@@ -128,8 +128,9 @@ skill updates):
 - `assets/` — background/decorative files the style relied on.
 
 With `--deploy <deck-dir>` the role-key art is also copied next to the deck as
-`images/template-bg-N.<ext>`, `template-logo.<ext>`, `template-decor-N.<ext>`,
-`template-photo-N.<ext>`, `template-icon-N.<ext>`, `template-brand-N.<ext>` and
+`images/template-bg-N.<ext>` (always numbered, even for one background),
+`template-logo.<ext>`, `template-decor-N.<ext>`, `template-photo-N.<ext>`,
+`template-icon-N.<ext>`, `template-brand-N.<ext>` and
 `images/template-assets.md` is written with paste-ready snippets and a map.
 Key mode deploys up to 20 assets (backgrounds 4, decor 6, photos 2, icons 4,
 logo 1); the slide-1 background is ranked first and marked `(cover)`, so the
@@ -180,7 +181,7 @@ merges all runs of a box into a single `<a:p>`, so without `<br>` PowerPoint
 shows the title and the body on one line (probe check `missing-br`).
 
 Acceptance tests: `single-box` and `flow-узлы` in `tests/local/run-local.cjs`.
-`lint-deck` also fails raw `<h3>/<p>/<ul>` inside `.card/.step/.kpi/.pill/.stat`
+`lint-deck` also fails raw `<h3>/<p>/<ul>` inside `.card/.kpi/.pill/.stat/.matrix .cell`
 (`raw <h3> inside .card`) — writing box text with block tags is the same defect
 found earlier, when the model fell back to raw HTML for a template copy.
 
@@ -191,6 +192,7 @@ found earlier, when the model fell back to raw HTML for a template copy.
 ... validate.cjs deck.html --pptx deck.pptx
 ... validate.cjs deck.pptx                 # artifact checks only
 ... validate.cjs deck.html --no-render     # no re-render (fast)
+... validate.cjs deck.html --out-dir <dir> --json <path>   # where the JSON report goes
 ```
 
 Two levels in one report:
@@ -208,8 +210,8 @@ Two levels in one report:
 |---|---|
 | `empty-slide` | the slide has no elements at all in the .pptx — it fell out of the export (check `display:none` / `.active`) |
 | `decor-as-background` | a transparent/decor/logo picture is stretched as a full-slide background (real incident: the template's cat decor became the final slide's background) | backgrounds come from `[background]`-role media or a token; decor stays decor |
-| `accent-heading` | a heading is painted in the accent color | headings stay ink; only section dividers use accent (probe error) |
-| `accent-overload` | an accent-filled surface covers >40% of the slide (the acid "slab") | keep accent to badges, numbers, one short card; content blocks use surface (probe error) |
+| `accent-heading` | a heading is painted in the accent color | headings stay ink; only section dividers use accent (suggestion — judged by eye, never blocks) |
+| `accent-overload` | an accent-filled surface covers >40% of the slide (the acid "slab") | keep accent to badges, numbers, one short card; content blocks use surface (suggestion — judged by eye, never blocks) |
 | `plain-cover` | the cover has no visual layer at all | add `cover-art`, decor, a logo or the template background |
 | `image-reuse` | the same non-chrome picture appears on 2+ slides (one generated image on three slides was a real case) | one image = one meaning: vary the file or drop the repeats |
 | `tiny-image` | a full-size picture is rendered as a small tile | enlarge it into an illustration or remove it |
@@ -229,13 +231,13 @@ Two levels in one report:
 | `native-text` | no native text in the .pptx (everything rasterized) |
 | `embedded-fonts` | no embedded TTF in the .pptx while text exists |
 | `autofit` | `normAutofit` already shrinks text (fontScale < 100%) |
-| `slide-count`, `notes`, `image-coverage`, `repeated-words` | too few slides; notes; no pictures; word repetition |
+| `slide-count`, `notes`, `visual-scarcity`, `repeated-words` | too few slides; notes; no pictures; word repetition |
 | `pptx-missing` | `validate.cjs deck.html` found no .pptx next to the deck | run `index.cjs deck.html --pptx`; the export is blocked until the render is clean |
 | `slide-count-mismatch` | the render saw more slides than the .pptx has — slides were dropped on export | find `display:none` / hidden slides, use `.active` |
 | `visual-scarcity` | the deck has almost no graphics (<3 pictures/SVG across ≥6 slides) | add Lucide icons, charts or photos |
 | `tight-line-spacing` | exact line spacing (the cause of overlap in PowerPoint; fixed by `pptx-post.cjs`) |
 
-Output: `validate: N error(s), M warning(s)` + `validate.json`; exit 1 when
+Output: `validate: N error(s), M warning(s)`; the JSON path is printed (`validate json: <path>`, override with `--json <path>` or `--out-dir <dir>`); exit 1 when
 there are errors. The loop goal is `validate: clean` (info lines are fine).
 When a `deck.html` is passed, the `.pptx` next to it must exist — it is the
 delivery artifact, so a missing file is an error (`pptx-missing`).
@@ -257,7 +259,8 @@ calls it automatically after `--pptx`.
 ## expand-styles.cjs — install the canonical CSS (managed block)
 
 ```bash
-... expand-styles.cjs deck.html
+... expand-styles.cjs deck.html            # dry-run: reports what would change
+... expand-styles.cjs deck.html --write    # applies (the pipeline expands a build copy itself)
 ```
 
 The deck declares one managed block:
@@ -278,7 +281,7 @@ automatically, so normally you never run it by hand.
 ## index.cjs — the whole pipeline in one command
 
 ```bash
-... index.cjs deck.html [--pptx] [--pdf] [--no-png] [--out-dir <dir>]
+... index.cjs deck.html [--pptx] [--pdf] [--no-png] [--out-dir <dir>] [--no-lint]
 ```
 
 1. `expand-styles.cjs` — install the canonical CSS into the managed block;
@@ -322,7 +325,7 @@ A renderer crash before any report (`Object has been destroyed`, `Render
 process gone`, `Target closed` — exit 3 without `report.json`) is transient:
 the helper captures the child's stderr and retries once automatically. If the
 retry crashes too, the deck or the app session is broken — read the printed
-stderr tail, do not guess about disk space or ask the user to restart the app.
+stderr tail. If the message says the app window was destroyed, tell the user to restart the app before retrying; never guess about disk space.
 
 ## report.json — layout issues
 
@@ -375,7 +378,7 @@ To read this without parsing JSON, run `inspect.cjs` (below).
 ## inspect.cjs — read the deck structure in text
 
 ```bash
-... inspect.cjs deck.html [--slide N] [--detail] [--out-dir <dir>] [--png] [--json <path>]
+... inspect.cjs deck.html [--slide N] [--detail] [--out-dir <dir>] [--png] [--json <path>] [--no-render]
 ```
 
 `review.cjs` already prints this read; `inspect.cjs` is the standalone version
@@ -394,6 +397,7 @@ is unavailable it falls back to a static HTML outline instead of failing.
 ... slide.cjs deck.html --get 3                   # exact <section>…</section> of slide 3
 ... slide.cjs deck.html --set 3 --from /tmp/slide-3.html
 ... slide.cjs deck.html --append --from /tmp/slide-11.html
+... slide.cjs deck.html --set 3 --from -       # fragment on stdin
 ```
 
 `deck.html` repeats the slide opening, logo and decor markup on every slide, so
@@ -436,7 +440,7 @@ charts are snippets from `charts.md`. No libraries in the deck.
   `styles/_base/icons.md`** (one line per name, 105 icons). There is no bare
   `node` binary in the app environment — do not try `node helpers/icons.cjs`;
   if you must regenerate the catalog:
-  `ELECTRON_RUN_AS_NODE=1 "$GIGATOOL_NODE" …/helpers/icons.cjs --get <name>`;
+  `ELECTRON_RUN_AS_NODE=1 "$GIGATOOL_NODE" …/helpers/icons.cjs --catalog`;
 - a font missing from `fonts/` → use the nearest vendored face and say so;
   `FONT NOT LOADED` in the report is an error, not a detail.
 
@@ -467,12 +471,15 @@ exits 2.
 ```
 
 One command for the whole loop: renders the deck, prints the paths of every
-`slide-NN.png` to LOOK at, lists probe issues, prints the structural read of
-every slide (background layer, decor, blocks, fills, issues — the same text
+`slide-NN.png` to LOOK at (the out-dir is cleaned first, so the list is always
+the current render — a reused dir used to show stale pictures from an older
+deck), lists probe issues, prints the structural read of every slide
+(background layer, decor, blocks, fills, issues — the same text
 `inspect.cjs` prints), runs `validate.cjs` on the existing `.pptx` (skipped with
 `--no-validate`), optionally renders reference shots of a template, and prints
 the review checklist (style consistency, layout variety, visual anchors, decor,
-template similarity, AI-slop signals).
+template similarity, AI-slop signals). When blocking errors exist it prints an
+ACTION line: fix via `slide.cjs --get/--set` (or one full rewrite), then re-run.
 
 The loop is: `review` → READ the PNGs (vision) → fix `deck.html` → `review`
 again, until `render: clean` AND the eyes agree; then `index.cjs --pptx` and
@@ -484,19 +491,19 @@ so an unreviewed dirty deck cannot slip through.
 | Symptom | Cause | What to do |
 |---|---|---|
 | `GIGATOOL_NODE is not set` | running outside the app | tell the user; do not fake a render |
-| `render: failed to start` | the app is not built / wrong path | check `$GIGATOOL_NODE`, ask the user |
+| `render: the renderer could not start or rejected its arguments (exit 2)` | the app is not built / wrong path / missing vendor or probe | check `$GIGATOOL_NODE`, vendor/ and probe.js |
 | `render: timed out` | the deck hangs (endless JS) | remove scripts from the deck except the navigator |
-| `render: N blocking issue(s) — export skipped` (exit 4) | blocking layout defects: the .pptx was not produced | fix the listed issues, re-run; export only after a clean render |
+| `render: N blocking error(s), M suggestion(s) — export skipped` (exit 4) | blocking layout defects: the .pptx was not produced | fix the listed issues, re-run; export only after a clean render |
 | `the deck is inside a temp directory` (lint) | the deck was built in `/tmp` — the user will not see it | build `deck.html` in the working folder |
 | `deck: FONT NOT LOADED` | the family is not vendored/declared | replace with a vendored face; `validate` raises `FONT NOT LOADED` |
 | `error FONT NOT LOADED` (validate) | font not vendored/declared | swap the token or add the face to `fonts/` |
 | `class(es) used but not defined` | a forgotten pattern/typo | check `patterns.md`, rerun lint |
 | `error FONT-SIZE` / `CONTRAST` / `PLACEHOLDER` | unreadable size, weak contrast, placeholder text | fix `deck.html` per the detail in the line |
 | `warn TYPOGRAPHY-QUOTES/DASH` | straight quotes / hyphen instead of a dash | use «ёлочки», `—`/`–` |
-| `warn MISSING-BR` | rows in a box are not separated by `<br>` | add `<br>` between rows |
+| `error MISSING-BR` | rows in a box are not separated by `<br>` | add `<br>` between rows |
 | `warn NO-ACCENT` | a content slide has nothing accented | highlight the key block (patterns.md, "Accent budget") |
 | `warn SPARSE-BOX` | a tall box is nearly empty | shorten the box or add substance |
-| `probe: N issue(s)` | see the type table | fix one by one, rerender |
+| `render: N issue(s) — K BLOCKING` (review.cjs) | see the type table; blocking errors exit 4 | fix one by one, rerender |
 | `Found multiple matches for oldString` / `Could not find oldString` (edit tool) | the slide opening, logo and decor markup repeat on every slide — the edit tool's `oldString` is ambiguous by design | switch to `slide.cjs`: `--get N` → edit the fragment → `--set N --from file` (or `--append`); a full rewrite in one write call also works. Never retry with more context and never re-run the pipeline on a failed edit |
 
 ## Skill files

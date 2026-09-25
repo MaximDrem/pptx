@@ -173,7 +173,7 @@ function pickColors(deck) {
       if (el.children) walkFills(el.children, slideNo);
     }
   };
-  for (const s of deck.slides) walkFills(s.elements, (s.index ?? 0) + 1);
+  for (const s of deck.slides) walkFills(s.elements, s.index); // s.index is 1-based already
   const topFills = [...fillCount.values()].sort((a, b) => b.count - a.count);
   const boxFill = topFills.find((f) => f.hex.toLowerCase() !== String(bgHex).toLowerCase()) || null;
   const fillCss = (f) =>
@@ -291,7 +291,7 @@ function pickAssets(deck, mode) {
   // The decor/icon quota is deliberately wide: a template mixes many elements
   // (banana + arrow + icons + photos), and one recycled decor on every slide
   // is exactly what made a copy look generated (real case).
-  const quotas = { background: 4, logo: 1, decor: 7, photo: 2, icon: 4 };
+  const quotas = { background: 5, logo: 1, decor: 7, photo: 2, icon: 4 };
   const out = [];
   const used = new Set();
   const take = (m) => {
@@ -404,7 +404,7 @@ function deployAssets(assetsDir, written, deckDir, deck, colors) {
   const pick = (role, n = 1) => written.filter((a) => a.role === role).slice(0, n);
   // Cover art first, then the most-used backgrounds: the deck's first
   // background should be the one the template uses on its cover.
-  const bgs = pick("background", 4)
+  const bgs = pick("background", 5)
     .slice()
     .sort((a, b) => (assetSlides(a).includes(1) ? 0 : 1) - (assetSlides(b).includes(1) ? 0 : 1) || b.usedBySlides.length - a.usedBySlides.length);
   const logo = pick("logo", 1)[0];
@@ -448,15 +448,20 @@ function deployAssets(assetsDir, written, deckDir, deck, colors) {
   };
 
   bgs.forEach((bg, bi) => {
-    const n = copyAs(bg, bgs.length === 1 ? "template-bg" : `template-bg-${bi + 1}`);
-    const slides = assetSlides(bg);
-    const cover = slides.includes(1);
+    // Always numbered (`template-bg-1`, not `template-bg`): one documented
+    // naming rule means the model cannot guess the wrong file name.
+    const n = copyAs(bg, `template-bg-${bi + 1}`);
+    const effective = bgSlides(bg.name);
+    const inherited = effective.length ? [] : assetSlides(bg).filter((s) => !effective.includes(s));
+    const cover = effective.includes(1);
     lines.push(
-      `## Background${bgs.length === 1 ? "" : ` ${bi + 1}`}${cover ? " (cover)" : ""}`,
+      `## Background ${bi + 1}${cover ? " (cover)" : ""}`,
       "",
-      slides.length
-        ? `Used as the slide background on template slides: ${slides.join(", ")} — put a background on EVERY slide that has one in the template (content slides included, not only cover/closing)`
-        : "The template uses this image as a background layer",
+      effective.length
+        ? `Used as the slide background on template slides: ${effective.join(", ")} — put a background on EVERY slide that has one in the template (content slides included, not only cover/closing)`
+        : inherited.length
+          ? `Comes from the slide layout (visible on template slides ${inherited.join(", ")}; the slide itself may place a different full-slide picture on top)`
+          : "The template uses this image as a background layer",
       "",
       "```html",
       `<img class="bg-img" src="images/${n}" alt="">`,
@@ -610,18 +615,24 @@ function deployAssets(assetsDir, written, deckDir, deck, colors) {
     }
   };
   const recipes = [];
+  const brandNames = new Set(brandings.map((a) => a.name));
   ((deck && deck.slides) || []).slice(0, 24).forEach((s, i) => {
     const parts = [];
     const bgMedia = s.effectiveBg && s.effectiveBg.media;
-    if (bgMedia) parts.push(`bg ${deployedName.get(bgMedia) || bgMedia}`);
+    if (bgMedia) {
+      parts.push(
+        deployedName.has(bgMedia) ? `bg ${deployedName.get(bgMedia)}` : `bg ${bgMedia} (not deployed — use one of images/template-bg-*)`,
+      );
+    }
     const seen = new Set();
     for (const el of walk(s.elements, [])) {
       if (!el.media || el.media === bgMedia || roleOf(el.media) === "background" || seen.has(el.media)) continue;
       seen.add(el.media);
       const px = el.box && el.box.px;
+      const role = brandNames.has(el.media) ? "branding" : roleOf(el.media);
+      const shown = deployedName.has(el.media) ? `${deployedName.get(el.media)}[${role}]` : `${el.media}[${role}, not deployed]`;
       parts.push(
-        `${deployedName.get(el.media) || el.media}[${roleOf(el.media)}] @${px ? Math.round(px.x) : "?"},${px ? Math.round(px.y) : "?"}` +
-          (px && px.rot ? ` rot${Math.round(px.rot)}°` : ""),
+        `${shown} @${px ? Math.round(px.x) : "?"},${px ? Math.round(px.y) : "?"}` + (px && px.rot ? ` rot${Math.round(px.rot)}°` : ""),
       );
     }
     const fills = new Map();

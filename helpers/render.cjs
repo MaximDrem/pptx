@@ -46,6 +46,44 @@ function readJson(file) {
 
 // Deliverables stay in the working folder (deck.html lives there): copy the
 // .pptx/.pdf out of the temp render dir unless an explicit --out-dir was used.
+// Our own render artifacts inside an out-dir. Everything else (user files) is
+// left alone.
+const ARTIFACT_RE = /^(slide-\d+\.png|report\.json|inventory\.json|captures\.json)$/i;
+function cleanArtifacts(dir) {
+  let removed = 0;
+  try {
+    for (const f of fs.readdirSync(dir)) {
+      if (!ARTIFACT_RE.test(f)) continue;
+      try {
+        fs.unlinkSync(path.join(dir, f));
+        removed++;
+      } catch {
+        // read-only leftovers must not break the render
+      }
+    }
+  } catch {
+    // no dir yet — the renderer will create it
+  }
+  return removed;
+}
+
+// Only contract violations block the export. Probe issues carry a severity;
+// the fallback set keeps older probes safe. Shared with review.cjs.
+const BLOCKING_TYPES = new Set([
+  "text-clip",
+  "out-of-bounds",
+  "text-overlap",
+  "low-contrast",
+  "blank",
+  "maybe-blank",
+  "mostly-empty",
+  "broken-image",
+  "stage-broken",
+  "probe-error",
+  "hidden-slide",
+  "missing-br",
+]);
+
 function deliverArtifacts(outDir, deck, opts) {
   if (opts.outDir) return [];
   const base = path.basename(deck).replace(/\.html?$/i, "");
@@ -124,10 +162,14 @@ function renderDeck(deckPath, opts = {}) {
     } catch {}
     return Promise.resolve({ ran: false, code: null, reason: "GIGATOOL_NODE is not set — run inside the workspace app" });
   }
-  const env = rendererEnv();
   const keep = !!opts.outDir || !!opts.pptx || !!opts.pdf;
   const outDir = path.resolve(opts.outDir || fs.mkdtempSync(path.join(os.tmpdir(), "deck-render-")));
   const timeoutMs = Number(process.env.PRESENTATION_RENDER_TIMEOUT_MS || 300000);
+  const env = rendererEnv();
+  // Tell the app watchdog to fire just before the helper's own kill timer, so
+  // a slow render produces the app's clean "timed out" message (and the
+  // helper's deterministic-failure branch) instead of a bare SIGKILL.
+  env.PRESENTATION_RENDER_TIMEOUT_MS = String(Math.max(30_000, timeoutMs));
 
   const args = [];
   if (env.GIGATOOL_APP_PATH) args.push(env.GIGATOOL_APP_PATH);
@@ -172,6 +214,22 @@ function renderDeck(deckPath, opts = {}) {
       let timedOut = false;
       let timer = null;
       let stderrTail = "";
+      // A REUSED out-dir is the normal case (`--out-dir /tmp/deck-check`): stale
+      // slide PNGs / report from the previous deck made review.cjs print 30
+      // image paths for a 1-slide render, and the model went looking at the
+      // wrong pictures. Drop our own artifacts before every attempt — but never
+      // in the authored deck's own folder (authored files are not ours to
+      // delete), and also drop a stale .pptx/.pdf for this deck so a blocked
+      // run cannot leave a previous build looking current.
+      if (path.resolve(outDir) !== path.dirname(deck)) cleanArtifacts(outDir);
+      const deckBase = path.basename(deck).replace(/\.html?$/i, "");
+      for (const ext of [".pptx", ".pdf"]) {
+        try {
+          fs.unlinkSync(path.join(outDir, deckBase + ext));
+        } catch {
+          // nothing to remove
+        }
+      }
       try {
         child = spawn(binary, args, { env, stdio: ["ignore", "pipe", "pipe"] });
       } catch (e) {
@@ -209,12 +267,14 @@ function renderDeck(deckPath, opts = {}) {
         const finalCode = code ?? 3;
         const destroyed = /has been destroyed|Render process gone|Target closed/i.test(stderrTail);
         const deterministic = !destroyed && /timed out|rendered 0 slides/i.test(stderrTail);
-        const crashed = finalCode === 3 && !fs.existsSync(path.join(outDir, "report.json"));
+        // exit 3 is a crash even when a report was written earlier: the export
+        // can die after report.json exists (dom-to-pptx on heavy effects).
+        const crashed = finalCode === 3;
         if (crashed && attemptNo === 1 && !deterministic) {
           console.error(
             destroyed
               ? "render: the app window was destroyed (Electron crash) — this is transient, retrying once"
-              : "render: the renderer crashed before writing a report — retrying once",
+              : "render: the renderer crashed (exit 3) — retrying once",
           );
           runOnce(2);
           return;
@@ -225,7 +285,11 @@ function renderDeck(deckPath, opts = {}) {
       // findings must survive even when nothing persistent was requested, and
       // they are still useful when the export was blocked (exit 4).
       const report = readJson(path.join(outDir, "report.json"));
-      const inventory = readJson(path.join(outDir, "inventory.json"));
+      const invRaw = readJson(path.join(outDir, "inventory.json"));
+      // The app writes {file, slides:[…]}; review/inspect/describe expect the
+      // bare array, so unwrap once here (was a real bug: the structural read
+      // silently never printed).
+      const inventory = invRaw && Array.isArray(invRaw.slides) ? invRaw.slides : invRaw;
       if (crashed) {
         // No retry left (or a deterministic failure): say WHAT crashed and
         // echo the captured stderr. In the real case the model got only
@@ -241,43 +305,55 @@ function renderDeck(deckPath, opts = {}) {
             "render: the app reported a deterministic render failure (timeout / 0 slides) — not retried. " +
               "Fix the deck: simplify the slide HTML and remove custom <script> code.",
           );
+        } else if (report) {
+          console.error(
+            "render: the renderer/export crashed after the report was written (exit 3) — if the slides rendered, " +
+              "the crash is in the .pptx export (heavy effects, custom <script>); simplify and re-run",
+          );
         } else {
           console.error(
             "render: the renderer crashed twice before writing a report — the page likely throws at runtime; " +
-              "remove custom <script> code (keep the example navigator) or rewrite the deck, then retry.",
+              "remove custom <script> code (keep the example navigator) or rewrite the deck, then retry",
           );
         }
         if (tail) console.error("render: last renderer stderr: " + tail.slice(0, 500));
+      } else if (finalCode === 2) {
+        console.error(
+          "render: the renderer could not start or rejected its arguments (exit 2) — check $GIGATOOL_NODE, vendor/ and probe.js; this is NOT a deck bug",
+        );
       } else if (finalCode !== 0 && !report) {
         console.error(
           "render: the deck produced no report — the HTML is likely malformed (an unclosed </section>) or throws at runtime; " +
             "lint-deck reports unbalanced <section> tags — fix them or rewrite the whole file",
         );
       }
+      if (finalCode === 0 && !report) {
+        console.error("render: the renderer exited 0 but wrote no report.json — treating it as a failed render (exit 3)");
+      }
       // Only contract violations block the export. Probe issues carry a
       // severity; the fallback set keeps older probes safe.
-      const BLOCKING = new Set([
-        "text-clip",
-        "out-of-bounds",
-        "text-overlap",
-        "low-contrast",
-        "blank",
-        "maybe-blank",
-        "mostly-empty",
-        "broken-image",
-        "stage-broken",
-        "probe-error",
-        "hidden-slide",
-        "missing-br",
-      ]);
-      const isBlocking = (i) => (i.severity ? i.severity === "error" : BLOCKING.has(i.type));
-      let effectiveCode = finalCode;
-      if (finalCode === 0 && (opts.pptx || opts.pdf) && report) {
+      const isBlocking = (i) => (i.severity ? i.severity === "error" : BLOCKING_TYPES.has(i.type));
+      let effectiveCode = finalCode === 0 && !report ? 3 : finalCode;
+      // Blocking findings must be exit 4 even without --pptx/--pdf: index.cjs
+      // documents 0 = clean, and an agent gating on $? was told "clean" while
+      // the render was full of blocking errors.
+      if ((effectiveCode === 0 || effectiveCode === 3) && report) {
         const blocking = (report.slides || []).reduce((n, s) => n + (s.issues || []).filter(isBlocking).length, 0);
         if (blocking > 0) {
-          console.error(`render: ${blocking} blocking error(s) — export skipped (fix deck.html and re-run; the .pptx is not delivered)`);
+          console.error(
+            `render: ${blocking} blocking error(s)${opts.pptx || opts.pdf ? " — export skipped (the .pptx is not delivered)" : ""} — fix deck.html and re-run`,
+          );
           effectiveCode = 4;
         }
+      }
+      // The app exits 4 before printing the per-issue lines (it gates the
+      // export first), so print them here from the parsed report.
+      if (effectiveCode === 4 && report) {
+        const lines = (report.slides || []).flatMap((s) =>
+          (s.issues || []).filter(isBlocking).map((i) => `slide ${s.index + 1}: ${i.type}: ${i.detail}`),
+        );
+        for (const line of lines.slice(0, 10)) console.error("  " + line);
+        if (lines.length > 10) console.error(`  … +${lines.length - 10} more (see report.json)`);
       }
       if (effectiveCode === 0 && opts.pptx) {
         try {
@@ -294,7 +370,7 @@ function renderDeck(deckPath, opts = {}) {
           console.error("artifact copy failed: " + (e.message || e));
         }
       }
-      finish({ ran: true, code: effectiveCode, outDir, kept: keep, post, report, inventory, artifacts, reason: effectiveCode !== finalCode ? "blocking layout issues — export skipped" : undefined });
+      finish({ ran: true, code: effectiveCode, outDir, kept: keep, post, report, inventory, artifacts, reason: effectiveCode === 4 ? "blocking layout issues" : undefined });
       });
     };
     runOnce(1);
@@ -337,4 +413,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { renderDeck };
+module.exports = { renderDeck, cleanArtifacts, BLOCKING_TYPES };

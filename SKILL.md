@@ -149,7 +149,7 @@ Then, **in this order**:
    `--deploy` copied the background/logo/decor into `images/` and wrote
    `images/template-assets.md` with snippets and **placement hints** from the
    template's own slides:
-   - `<img class="bg-img" src="images/template-bg…" alt="">` as the FIRST child
+   - `<img class="bg-img" src="images/template-bg-1.png" alt="">` as the FIRST child
      of **every slide that has a background in the template** — for corporate
      templates that is usually most content slides too, not only cover and
      closing (a copy with the background on two slides reads as a different
@@ -256,6 +256,14 @@ replaces the Nth `<section>` exactly (no matching at all). Rules:
   footers) either loop over slides or rewrite the whole file in one write;
 - a failed edit means the change is NOT in the file — never re-run the pipeline
   as if it landed;
+- **the same error twice means the fix missed the cause**: do not re-run the
+  same command (weak runtimes stop the turn for repeated tool calls). Open the
+  slide (`slide.cjs --get N`), change the offending element, and re-run once.
+  For `LOW-CONTRAST` change the COLOR or the backdrop — `var(--c-ink)` for
+  body, `.card.deep/.card.inverse` on light slides — **not** the font weight;
+  for `raw <p> inside .card` replace `<p>x</p>` with
+  `<span class="t-body">x</span>`, `<h3>x</h3>` with
+  `<span class="t-title">x</span>`, rows separated by `<br>`;
 - **never invent asset names**: run `slide.cjs --list`/list `images/` or read
   `images/template-assets.md` before referencing `template-*` — a guessed
   `template-bg.png` instead of `template-bg-1.png` fails lint/assets and
@@ -298,7 +306,7 @@ Markup rules:
 - **one-box rule**: text inside a colored box is written as runs directly in
   the box (`.t-title/.t-body/.t-cap`, `<b>`, `<br>`) with nothing else in the
   box; icons/badges go next to it via `.card-stack`. Raw `<h3>/<p>/<ul>`
-  inside `.card/.step/.kpi/.pill/.stat` is a lint error — it splits the box
+  inside `.card/.kpi/.pill/.stat/.matrix .cell` is a lint error — it splits the box
   into extra shapes and loses its style. **Separate every row
   boundary with `<br>`** — without it the exporter merges the runs into one
   paragraph (probe blocks `missing-br`);
@@ -311,7 +319,7 @@ Markup rules:
   icons, numbers, one short card (≤2 lines), a highlighted row. Headings stay
   ink (only section dividers are accent); never paint a content block with an
   OPAQUE accent — a surface over 40% of the slide is a slab (error
-  `accent-overload`). When the template highlights blocks, copy its recipe: a
+  `accent-overload`, a suggestion judged by eye). When the template highlights blocks, copy its recipe: a
   translucent tint (`.card.tint` / `--c-accent-soft`), not a solid fill;
   suggestions `accent-heading`;
 - **visual anchor**: every content slide has something to look at — a Lucide
@@ -366,7 +374,9 @@ be fixed) or `suggestion:` (taste — judge visually). It also prints a
 **structural read** of every slide (background layer, decor with coordinates,
 blocks, fills, probe issues). Use it when a suggestion needs exact numbers;
 `inspect.cjs deck.html --slide N --detail` prints the same for one slide with
-block geometry. The loop is:
+block geometry. The out-dir is cleaned before each render, so the printed PNG
+list always matches THIS deck — never act on pictures you did not just receive.
+The loop is:
 
 1. **review** — run the command;
 2. **look** — READ every printed PNG (vision). For a 10-slide deck that is 10

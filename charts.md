@@ -97,10 +97,10 @@ effort/impact matrix — `.matrix`:
 ```html
 <div class="matrix">
   <div class="axis-y">Impact</div>
-  <div class="cell accent"><h3>Quick wins</h3><p>High impact, low effort.</p></div>
-  <div class="cell"><h3>Big projects</h3><p>High impact, much work.</p></div>
-  <div class="cell"><h3>Routine</h3><p>Low impact, low effort.</p></div>
-  <div class="cell"><h3>Do not do</h3><p>Low impact, much work.</p></div>
+  <div class="cell accent"><span class="t-title">Quick wins</span><br><span class="t-body">High impact, low effort.</span></div>
+  <div class="cell"><span class="t-title">Big projects</span><br><span class="t-body">High impact, much work.</span></div>
+  <div class="cell"><span class="t-title">Routine</span><br><span class="t-body">Low impact, low effort.</span></div>
+  <div class="cell"><span class="t-title">Do not do</span><br><span class="t-body">Low impact, much work.</span></div>
   <div class="axis-x">Effort</div>
 </div>
 ```
@@ -114,5 +114,8 @@ effort/impact matrix — `.matrix`:
 - captions inside SVG stay part of the vector group, not separate text. If
   captions must be editable in PowerPoint, put them in HTML next to the SVG
   (like `.legend` and `.hbar .val`), not inside the SVG;
-- verify the result with `render.cjs --pptx` and review slides in PowerPoint:
-  the test deck `tests/fixtures/patterns-body.html` is the reference.
+- verify the result with
+  `index.cjs deck.html --pptx` (full run) or
+  `render.cjs deck.html --pptx --out-dir /tmp/chart-check`, then look at the
+  exported slides in PowerPoint: the test deck `tests/fixtures/patterns-body.html`
+  is the reference.

@@ -61,7 +61,9 @@ async function main() {
     try {
       execFileSync(process.execPath, [path.join(__dirname, "lint-deck.cjs"), absDeck], { stdio: "inherit", timeout: 120000 });
     } catch (e) {
-      console.error("index: lint-deck found blocking errors — fix them and re-run");
+      console.error("index: lint-deck found blocking errors — fix them, then re-run this command");
+      console.error("index: per-slide fix: slide.cjs deck.html --get N > /tmp/slide-N.html; edit that fragment; slide.cjs deck.html --set N --from /tmp/slide-N.html");
+      console.error("index: do not re-run this exact command without changing deck.html — the same errors come back and the run stalls");
       process.exit(1);
     }
   }
@@ -74,7 +76,8 @@ async function main() {
   });
   if (!r.ran) {
     console.error("index: render failed: " + r.reason);
-    process.exit(2);
+    // A killed renderer (OOM/external) is a failed render, not a setup error.
+    process.exit(/killed by/i.test(String(r.reason)) ? 3 : 2);
   }
   if (r.kept) console.log("render dir: " + r.outDir);
   process.exit(r.code ?? 3);

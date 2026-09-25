@@ -56,12 +56,19 @@ const MIME = {
 const mimeOf = (file) => MIME[path.extname(file).toLowerCase()] || "application/octet-stream";
 
 // Local/remote references of a deck: url(...), <img src>, <script src>, <link href>.
-function collectRefs(html) {
+// Comments are stripped first: the canonical CSS comment "assets.cjs inlines
+// the url(...) refs" used to be collected as a reference named "..." and made
+// review/validate fail a clean deck with a false MISSING-FILE.
+function collectRefs(raw) {
+  const html = String(raw)
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .replace(/<!--[\s\S]*?-->/g, " ");
   const refs = [];
   const push = (ref, kind) => {
     if (!ref) return;
     const r = ref.trim();
     if (!r || isData(r)) return;
+    if (kind === "url" && (/[\s<>]/.test(r) || r === "..." || r === "…" || r === "*")) return; // prose placeholder, not a file
     refs.push({ ref: r, kind });
   };
   let m;

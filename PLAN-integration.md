@@ -13,7 +13,7 @@ BrowserWindow, which already exists in production for `--pptx-verify`.
 | From (this repository) | To (desktop-ai-app) |
 |---|---|
 | `presentation_v3/*` | `packages/desktop-electron/resources/defaults/skills/presentation/` (delete the folder and replace it entirely) |
-| `presentation_v3/.bundle-version` (= 57) | already inside the folder above |
+| `presentation_v3/.bundle-version` (= 58) | already inside the folder above |
 | `presentation_v3/app/deck-render.ts` | `src/main/deck-render.ts` |
 | the detector from `deck-render.ts` (`isRunDeckRender`) | `src/main/deck-render-check.ts` (mirroring `pptx-verify-check.ts`) |
 
@@ -24,7 +24,7 @@ cp -r /path/to/presentation_v3 packages/desktop-electron/resources/defaults/skil
 git add packages/desktop-electron/resources/defaults/skills/presentation
 ```
 
-Verify `.bundle-version` = `57` (the currently installed one = 35; when the
+Verify `.bundle-version` = `58` (the currently installed one = 35; when the
 number increases, `seed-defaults.ts` deletes the user's folder and re-seeds it
 entirely — the old skill rolls out by itself).
 
@@ -96,7 +96,7 @@ as in `--pptx-verify`.
 
 `presentation` is already in `versionStampedSkills` (the line exists in the
 current version) — no code change is needed, only the new
-`.bundle-version = 57`. If the line is actually missing, add it following the
+`.bundle-version = 58`. If the line is actually missing, add it following the
 neighboring skills.
 
 ### 2.5 Packaging
@@ -240,3 +240,34 @@ by telling the user how to edit the HTML (a real run answered «вам потр�
 вручную добавить фон…» instead of finishing). The lint background-coverage
 error now counts slides that actually have a background and names the required
 number + asset class instead of leaking profile counters. No app change.
+
+## 13. v58 addition: the loop cannot lie about what it rendered
+
+v58 audit batch (four independent audits: render/app contract, docs vs code,
+template extraction behavior, helper CLIs). Fixed on top of the render-loop
+fix: `inventory.json` wrapper made review's structural read dead code (now
+unwrapped in render.cjs); review ignores a crashed render and printed "clean"
+with partial PNGs (now fails the turn with the real exit code); blocking
+findings exit 4 without an export too; the app prints per-issue lines before
+the export gate and its watchdog honors PRESENTATION_RENDER_TIMEOUT_MS;
+stale `.pptx`/`.pdf` in a reused out-dir are removed and review refuses to
+validate a .pptx older than deck.html; `box styles` slide numbers were off by
+one; backgrounds are always `template-bg-N` and list effective slides;
+`expand-styles.cjs` writes only with `--write`; `refs.cjs` ignores CSS/HTML
+comments (the canonical comment used to fail review with a false MISSING-FILE
+for "..." on clean decks); lint's one-box scan is depth-aware and covers
+`.matrix .cell`; the undefined-class warning now uses the canonical CSS;
+docs corrected (accent-* are suggestions, charts/patterns snippets no longer
+split boxes, slide.cjs instead of footer anchors, real diagnostic strings).
+
+A real 1-slide run reused `--out-dir /tmp/deck-check` from a previous 30-slide
+deck: the renderer wrote slide-01.png, review listed slide-01…30, and the model
+went looking at the wrong pictures. `render.cjs` now removes its own artifacts
+(slide-NN.png, report.json, inventory.json) from the out-dir before every
+attempt; `shots.cjs` does the same before `--pptx-verify`. `review.cjs` prints
+an explicit ACTION line when blocking errors exist and repeats the
+slide.cjs/full-rewrite recovery path; `index.cjs` does the same after a lint
+failure. Lint messages for the one-box rule / missing footer / missing
+background / missing decor now include the exact paste-ready snippet, and
+LOW-CONTRAST names the measured text color and says to fix the color/backdrop,
+not the font weight. No app change.

@@ -12,9 +12,9 @@ Rules shared by all patterns:
 - `data-role`: `cover | section | content | quote | closing`. Emptiness checks
   depend on the role;
 - footer: `<div class="footer"><span>Section</span><span>NN</span></div>` —
-  the last element of `.slide-pad`; the `NN` numbering also makes every
-  slide block uniquely addressable when editing (anchor on the previous
-  slide's footer; see SKILL step 3);
+  the last element of `.slide-pad`; to change one slide use `slide.cjs
+  --get N → edit → --set N` (the markup repeats, the edit tool's oldString
+  is ambiguous; see SKILL step 3);
 - heading: `.kicker` + `.headline` (`.xl` for cover/section, `.wide` for long
   headings);
 - speaker notes: `<template data-pptx-notes>text</template>` — hidden on the
@@ -69,7 +69,7 @@ one click.
 - **accent discipline**: accent is small by design — badges, icons, numbers,
   one short card (≤2 lines), a highlighted row. Headings stay ink (only
   section dividers are accent). A surface over 40% of the slide → error
-  `accent-overload` (the acid "slab" defect: never paint a content block with
+  `accent-overload` (the acid "slab" defect — a suggestion judged by eye, never a blocker: do not paint a content block with
   an opaque accent). For a highlighted block use the template's recipe:
   `.card.tint` (translucent `--c-accent-soft`) reads as a highlight, while
   `.card.accent` (solid) is only for ONE short key message;
@@ -210,7 +210,7 @@ editable in .pptx. Add a `.lead` under the table when the slide has room.
 
 Three steps is optimal (four max). Icons are optional but make the pattern
 substantially more expressive; `.step.accent` marks the decisive step.
-Icons come from `node helpers/icons.cjs --get <name>` (Lucide), never emoji.
+Icons come from the paste-ready lines in `styles/_base/icons.md` (Lucide), never emoji.
 
 ## 7. flow — process with arrows
 
@@ -248,7 +248,7 @@ Icons come from `node helpers/icons.cjs --get <name>` (Lucide), never emoji.
       <li>Third thesis about a risk.</li>
     </ul>
     <div class="card">
-      <div class="card-cap">Risk</div><br>
+      <span class="card-cap">Risk</span><br>
       <span class="t-title">A concrete risk</span><br>
       <span class="t-body">What happens if nothing changes.</span>
     </div>

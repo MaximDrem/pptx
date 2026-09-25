@@ -30,9 +30,11 @@ const RENDER_W = 1280
 const RENDER_H = 720
 const PAGE_W_IN = 40 / 3 // 13.333in — the deck stage at 96dpi
 const PAGE_H_IN = 7.5
-const TIMEOUT_MS = 240_000
+// The helper may raise the budget via PRESENTATION_RENDER_TIMEOUT_MS (it also
+// sets it just below its own kill timer); never allow 0/NaN to disable it.
+const TIMEOUT_MS = Math.max(30_000, Number(process.env.PRESENTATION_RENDER_TIMEOUT_MS || 240_000) - 3_000)
 
-type Issue = { type: string; detail: string }
+type Issue = { type: string; detail: string; severity?: string }
 type SlideReport = { index: number; issues: Issue[] }
 type Logger = { log: (...args: unknown[]) => void; error: (...args: unknown[]) => void }
 
@@ -104,7 +106,7 @@ async function run(
     app.exit(code)
   }
   const watchdog = setTimeout(() => {
-    console.error(`render: timed out after ${TIMEOUT_MS / 1000}s`)
+    console.error(`render: timed out after ${Math.round(TIMEOUT_MS / 1000)}s`)
     exit(3)
   }, TIMEOUT_MS)
 
@@ -219,6 +221,7 @@ async function run(
           report.issues.push({
             type: "low-contrast",
             detail: "slide has content but captures as a near-uniform image — text may match the background color",
+            severity: "error",
           })
         } else if (!pixelBlank[i] && domBlank) {
           report.issues = report.issues.filter((issue) => issue.type !== "maybe-blank")
@@ -273,12 +276,47 @@ async function run(
     const isBlocking = (i: { type: string; severity?: string }) => (i.severity ? i.severity === "error" : BLOCKING.has(i.type))
     const countBy = (fn: (i: { type: string; severity?: string }) => boolean) =>
       domReports.reduce((n, r) => n + (r.issues ?? []).filter(fn).length, 0)
+
+    // Print every finding BEFORE the export gate: exit 4 used to skip these
+    // lines, so the agent saw "N blocking error(s)" with no slide/type.
+    const totalIssues = domReports.reduce((n, r) => n + (r.issues?.length ?? 0), 0)
+    const errorCount = countBy(isBlocking)
+    const suggestionCount = totalIssues - errorCount
+    const label: Record<string, string> = {
+      "text-clip": "TEXT CLIPPED",
+      "out-of-bounds": "OUT OF BOUNDS",
+      "low-contrast": "LOW CONTRAST",
+      blank: "BLANK SLIDE",
+      "maybe-blank": "BLANK SLIDE",
+      "broken-image": "BROKEN IMAGE",
+      "empty-region": "EMPTY REGION",
+      "text-overlap": "TEXT OVERLAP",
+      "stage-broken": "STAGE BROKEN",
+      "probe-error": "PROBE ERROR",
+      "mostly-empty": "MOSTLY EMPTY",
+      "image-reuse": "IMAGE REUSED",
+      "tiny-image": "TINY IMAGE",
+      "hidden-slide": "HIDDEN SLIDE",
+      "missing-br": "MISSING BR",
+      "no-accent": "NO ACCENT",
+      "accent-heading": "ACCENT HEADING",
+      "accent-overload": "ACCENT OVERLOAD",
+      "plain-cover": "PLAIN COVER",
+      "sparse-box": "SPARSE BOX",
+      "tight-gap": "TIGHT GAP",
+      "img-no-alt": "IMG NO ALT",
+    }
+    for (const report of domReports) {
+      for (const issue of report.issues) {
+        const kind = isBlocking(issue) ? "error" : "suggestion"
+        console.log(`slide ${report.index + 1}: ${kind}: ${label[issue.type] ?? issue.type.toUpperCase()}: ${issue.detail}`)
+      }
+    }
+
     if (opts.pptx || opts.pdf) {
-      const blocking = countBy(isBlocking)
-      const suggestions = countBy((i) => !isBlocking(i))
-      if (blocking > 0) {
+      if (errorCount > 0) {
         console.log(
-          `render: ${blocking} blocking error(s), ${suggestions} suggestion(s) — export skipped. Fix deck.html and re-run; export only after a clean render.`,
+          `render: ${errorCount} blocking error(s), ${suggestionCount} suggestion(s) — export skipped. Fix deck.html and re-run; export only after a clean render.`,
         )
         exit(4)
       }
@@ -320,39 +358,6 @@ async function run(
       )
     }
 
-    const totalIssues = domReports.reduce((n, r) => n + (r.issues?.length ?? 0), 0)
-    const errorCount = countBy(isBlocking)
-    const suggestionCount = totalIssues - errorCount
-    const label: Record<string, string> = {
-      "text-clip": "TEXT CLIPPED",
-      "out-of-bounds": "OUT OF BOUNDS",
-      "low-contrast": "LOW CONTRAST",
-      blank: "BLANK SLIDE",
-      "maybe-blank": "BLANK SLIDE",
-      "broken-image": "BROKEN IMAGE",
-      "empty-region": "EMPTY REGION",
-      "text-overlap": "TEXT OVERLAP",
-      "stage-broken": "STAGE BROKEN",
-      "probe-error": "PROBE ERROR",
-      "mostly-empty": "MOSTLY EMPTY",
-      "image-reuse": "IMAGE REUSED",
-      "tiny-image": "TINY IMAGE",
-      "hidden-slide": "HIDDEN SLIDE",
-      "missing-br": "MISSING BR",
-      "no-accent": "NO ACCENT",
-      "accent-heading": "ACCENT HEADING",
-      "accent-overload": "ACCENT OVERLOAD",
-      "plain-cover": "PLAIN COVER",
-      "sparse-box": "SPARSE BOX",
-      "tight-gap": "TIGHT GAP",
-      "img-no-alt": "IMG NO ALT",
-    }
-    for (const report of domReports) {
-      for (const issue of report.issues) {
-        const kind = isBlocking(issue) ? "error" : "suggestion"
-        console.log(`slide ${report.index + 1}: ${kind}: ${label[issue.type] ?? issue.type.toUpperCase()}: ${issue.detail}`)
-      }
-    }
     console.log(`render: ${meta.slideCount} slide(s) → ${opts.outDir}`)
     console.log(`report: ${reportPath}`)
     console.log(`inventory: ${inventoryPath}`)

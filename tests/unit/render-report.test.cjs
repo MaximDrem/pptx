@@ -17,7 +17,7 @@ const path = require("path");
 const fs = require("fs");
 const os = require("os");
 const assert = require("assert");
-const { renderDeck } = require(path.join(__dirname, "..", "..", "helpers", "render.cjs"));
+const { renderDeck, cleanArtifacts } = require(path.join(__dirname, "..", "..", "helpers", "render.cjs"));
 
 const STUB = `"use strict";
 const fs = require("fs");
@@ -53,6 +53,7 @@ fs.writeFileSync(path.join(out, "report.json"), JSON.stringify({
   slides: [{ index: 0, issues: [{ type: "img-no-alt", detail: "1 image without alt" }] }],
 }));
 fs.writeFileSync(path.join(out, "inventory.json"), JSON.stringify({ slides: [] }));
+fs.writeFileSync(path.join(out, "slide-01.png"), "png");
 // build-copy check: relative refs must be resolvable next to the deck
 const refImg = path.join(path.dirname(deck), "images", "px.png");
 fs.writeFileSync(path.join(out, "saw-image.txt"), fs.existsSync(refImg) ? "yes" : "no");
@@ -214,6 +215,30 @@ async function main() {
     delete process.env.STUB_CRASH_COUNTER;
     assert.strictEqual(r9.code, 3, "the app timeout must surface exit 3");
     assert.strictEqual(fs.readFileSync(counter, "utf8"), "x", "a deterministic timeout must not be retried");
+  }
+
+  // 10. A reused out-dir: stale slide PNGs from a previous, bigger deck are
+  //     cleaned, so review's picture list always matches THIS render (a real
+  //     run printed 30 paths for a 1-slide deck and sent the model to the
+  //     wrong pictures).
+  {
+    const reused = path.join(dir, "reused-out");
+    fs.mkdirSync(reused, { recursive: true });
+    for (let i = 1; i <= 30; i++) fs.writeFileSync(path.join(reused, `slide-${String(i).padStart(2, "0")}.png`), "stale");
+    fs.writeFileSync(path.join(reused, "report.json"), '{"stale":true}');
+    fs.writeFileSync(path.join(reused, "keep.txt"), "keep me");
+    assert.strictEqual(cleanArtifacts(reused), 31, "30 stale PNGs + stale report are removed");
+    assert.ok(fs.existsSync(path.join(reused, "keep.txt")), "foreign files are left alone");
+    assert.ok(!fs.existsSync(path.join(reused, "slide-30.png")), "stale pictures are gone");
+
+    for (let i = 1; i <= 30; i++) fs.writeFileSync(path.join(reused, `slide-${String(i).padStart(2, "0")}.png`), "stale");
+    const freshDeck = path.join(dir, "reused.deck.html");
+    fs.writeFileSync(freshDeck, "<!doctype html><html><body></body></html>");
+    const r10 = await renderDeck(freshDeck, { outDir: reused });
+    assert.strictEqual(r10.code, 0, "the reused dir render succeeds");
+    assert.ok(!fs.existsSync(path.join(reused, "slide-30.png")), "the render cleans stale pictures before it starts");
+    assert.ok(fs.existsSync(path.join(reused, "slide-01.png")), "the fresh capture survives");
+    assert.strictEqual(r10.report && r10.report.stale, undefined, "the stale report was replaced by the fresh one");
   }
 
   console.log("PASS  render: отчёт переживает очистку temp, артефакты кладутся рядом с deck.html");

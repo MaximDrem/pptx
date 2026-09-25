@@ -80,7 +80,13 @@ function main() {
     console.error("slide: deck not found: " + abs);
     process.exit(2);
   }
-  const html = fs.readFileSync(abs, "utf8");
+  let html;
+  try {
+    html = fs.readFileSync(abs, "utf8");
+  } catch (e) {
+    console.error("slide: cannot read " + abs + ": " + (e && e.code ? e.code : e && e.message));
+    process.exit(2);
+  }
   const secs = sectionsOf(html);
   if (!secs.length) {
     console.error("slide: no <section> found in " + abs);
@@ -90,7 +96,7 @@ function main() {
   if (argv.includes("--list")) {
     for (let i = 0; i < secs.length; i++) {
       const m = meta(secs[i]);
-      console.log(`slide ${i + 1}/${secs.length} [${m.role}]${m.title ? " «" + m.title + "»" : ""} (${secs[i].text.length} bytes)`);
+      console.log(`slide ${i + 1}/${secs.length} [${m.role}]${m.title ? " «" + m.title + "»" : ""} (${Buffer.byteLength(secs[i].text)} bytes)`);
     }
     return;
   }
