@@ -13,6 +13,7 @@
 .slide-pad {
   position: absolute;
   inset: 0;
+  z-index: 1;
   padding: 52px 72px 60px;
   display: flex;
   flex-direction: column;
@@ -362,15 +363,14 @@
 .rule-brand.wide { width: 180px; }
 
 /* Template assets: the standard way to reuse a copied deck's background,
-   logo and decor (see style-profile.cjs --deploy). Put .bg-img FIRST inside
-   the slide; .logo usually sits top-right; .decor-img may bleed off-slide.
-   A slide that carries a logo gets `with-logo`: it reserves the top chrome
-   band so the heading never collides with the logo. */
-.bg-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
-.logo { position: absolute; top: 40px; right: 72px; height: 30px; width: auto; pointer-events: none; }
+   logo and decor (see style-profile.cjs --deploy). The layers are pinned by
+   z-index, so child order inside the slide no longer matters: the background
+   can never cover the content, and logo/decor always sit above it. */
+.bg-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; z-index: 0; }
+.logo { position: absolute; top: 40px; right: 72px; height: 30px; width: auto; pointer-events: none; z-index: 2; }
 .logo.pos-tl { left: 72px; right: auto; }
 .logo.lg { height: 42px; }
-.decor-img { position: absolute; pointer-events: none; }
+.decor-img { position: absolute; pointer-events: none; z-index: 2; }
 .decor-img.round { border-radius: 50%; }
 .decor-img.pos-br { bottom: -60px; right: -40px; }
 .slide.with-logo .slide-pad { padding-top: 104px; }

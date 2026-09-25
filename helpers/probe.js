@@ -547,8 +547,10 @@
       }
     }
     // Decor over text: never blocks, but the eye misses it (a real copy put a
-    // squashed photo on top of the content). Judged in the render.
-    for (const decor of Array.from(slide.querySelectorAll(".decor-img, .decor"))) {
+    // squashed photo on top of the content). Judged in the render. Only real
+    // images (.decor-img): translucent .decor washes UNDER bottom-aligned
+    // cover text are the canonical composition, not an accident.
+    for (const decor of Array.from(slide.querySelectorAll(".decor-img"))) {
       const dRect = decor.getBoundingClientRect();
       if (dRect.width <= 8 || dRect.height <= 8) continue;
       if (isFullSlide(dRect, slideRect)) continue;
@@ -862,7 +864,9 @@
     const results = withAllSlidesMeasurable(() =>
       list.map((slide, i) => {
         try {
-          for (const el of Array.from(slide.querySelectorAll(".decor-img, .decor"))) {
+          // Only image decor: repeating a translucent .decor wash across
+          // slides is a design system, not a stamp.
+          for (const el of Array.from(slide.querySelectorAll(".decor-img"))) {
             const r = el.getBoundingClientRect();
             if (r.width < 8 || r.height < 8) continue;
             const bg = String(getComputedStyle(el).backgroundImage || "");

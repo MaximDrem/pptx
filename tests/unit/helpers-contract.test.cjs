@@ -58,7 +58,7 @@ function main() {
 
   // 2. Blocking-error sets stay in sync.
   const probe = errorSet(path.join(H, "probe.js"), /const ERROR_TYPES = new Set\(\[([\s\S]*?)\]\)/);
-  const render = errorSet(path.join(H, "render.cjs"), /const BLOCKING = new Set\(\[([\s\S]*?)\]\)/);
+  const render = errorSet(path.join(H, "render.cjs"), /const BLOCKING_TYPES = new Set\(\[([\s\S]*?)\]\)/);
   const validate = errorSet(path.join(H, "validate.cjs"), /const isError = issue\.severity[\s\S]*?\[([\s\S]*?)\]\.includes\(issue\.type\)/);
   const app = errorSet(path.join(SKILL, "app", "deck-render.ts"), /const BLOCKING = new Set\(\[([\s\S]*?)\]\)/);
   for (const [name, set] of [["render.cjs", render], ["validate.cjs", validate], ["app/deck-render.ts", app]]) {

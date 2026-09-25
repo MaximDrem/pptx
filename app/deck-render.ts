@@ -327,7 +327,11 @@ async function run(
           console.log(
             `render: ${errorCount} blocking error(s), ${suggestionCount} suggestion(s) — export skipped. Fix deck.html and re-run; export only after a clean render.`,
           )
+          // app.exit() does not stop this function: without the return the
+          // code fell through into the pptx branch and touched the destroyed
+          // window ("Object has been destroyed" — looked like an app crash).
           exit(4)
+          return
         }
       }
     }

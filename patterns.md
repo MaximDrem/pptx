@@ -43,6 +43,8 @@ one click.
 
 - `.t-title` / `.t-body` / `.t-cap` are row runs; `<b>` inside a row is
   emphasis;
+- if the deck already has raw `<h3>/<p>/<ul>` inside boxes,
+  `lint-deck.cjs deck.html --fix` repairs them mechanically;
 - **every row boundary must be a `<br>`.** The exporter merges all runs of a
   box into a single `<a:p>`; without `<br>` PowerPoint shows the title and the
   body on one line. Probe warns `missing-br`;

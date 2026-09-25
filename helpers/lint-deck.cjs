@@ -73,6 +73,164 @@ function boxInners(html, boxClass) {
   return out;
 }
 
+// ---- --fix: mechanical one-box repair -------------------------------------
+// What it does inside .card/.kpi/.pill/.stat/.cell (direct children only):
+//   <h1..h6>…</hN> → <span class="t-title">…</span>
+//   <p>…</p>       → <span class="t-body">…</span>
+//   <ul><li>a<li>b → <span class="t-body">a<br>b</span>   (ol numbers kept)
+//   adjacent row runs without a <br> between them get one (missing-br)
+// Deeper structure and everything outside the boxes is left untouched.
+
+const VOID_TAGS = new Set(["img", "hr", "input", "source", "wbr", "area", "base", "col", "embed", "track"]);
+const ROW_LIKE = new Set(["span", "b", "strong", "em", "i", "small"]);
+
+function parseAttrs(open) {
+  const attrs = {};
+  const re = /([a-zA-Z_:][-a-zA-Z0-9_:.]*)\s*=\s*(?:"([^"]*)"|'([^']*)')/g;
+  let m;
+  while ((m = re.exec(open))) attrs[m[1].toLowerCase()] = m[2] !== undefined ? m[2] : m[3];
+  return attrs;
+}
+
+// Top-level nodes of a box's inner HTML (tags with depth-aware closes).
+function topNodes(inner) {
+  const nodes = [];
+  let i = 0;
+  const openRe = /^<([a-z][a-z0-9]*)\b[^>]*>/i;
+  while (i < inner.length) {
+    if (inner[i] === "<") {
+      const m = openRe.exec(inner.slice(i));
+      if (!m) {
+        nodes.push({ type: "text", text: "<" });
+        i++;
+        continue;
+      }
+      const tag = m[1].toLowerCase();
+      if (VOID_TAGS.has(tag) || m[0].endsWith("/>")) {
+        nodes.push({ type: "el", tag, open: m[0], whole: m[0], content: "" });
+        i += m[0].length;
+        continue;
+      }
+      const closeRe = new RegExp(`</?${tag}\\b[^>]*>`, "gi");
+      closeRe.lastIndex = i + m[0].length;
+      let depth = 1;
+      let t;
+      while ((t = closeRe.exec(inner))) {
+        if (t[0][1] === "/") depth--;
+        else depth++;
+        if (depth === 0) break;
+      }
+      const end = t ? t.index + t[0].length : inner.length;
+      nodes.push({ type: "el", tag, open: m[0], whole: inner.slice(i, end), content: inner.slice(i + m[0].length, t ? t.index : inner.length) });
+      i = end;
+    } else {
+      const next = inner.indexOf("<", i);
+      const stop = next === -1 ? inner.length : next;
+      nodes.push({ type: "text", text: inner.slice(i, stop) });
+      i = stop;
+    }
+  }
+  return nodes;
+}
+
+function fixBoxInner(inner) {
+  const what = [];
+  const nodes = topNodes(inner);
+  let out = "";
+  let prevRow = false; // previous emitted node was a row run (needs <br> before the next one)
+  let pendingBreak = false; // whitespace gap since the last row run
+  for (const n of nodes) {
+    if (n.type === "text") {
+      if (n.text.trim() === "") {
+        if (prevRow) pendingBreak = true;
+        out += n.text.includes("\n") ? "\n" : n.text;
+        continue;
+      }
+      out += n.text;
+      prevRow = false;
+      pendingBreak = false;
+      continue;
+    }
+    if (n.tag === "br") {
+      out += n.whole;
+      prevRow = false;
+      pendingBreak = false;
+      continue;
+    }
+    if (/^(h[1-6]|p)$/i.test(n.tag) || n.tag === "ul" || n.tag === "ol") {
+      if (prevRow) out += "<br>";
+      const a = parseAttrs(n.open);
+      const extra = a.class ? " " + a.class : "";
+      const keep = ["style", "id", "lang", "data-role"].filter((k) => a[k]).map((k) => `${k}="${a[k]}"`).join(" ");
+      if (n.tag === "ul" || n.tag === "ol") {
+        const items = [];
+        const liRe = /<li\b[^>]*>([\s\S]*?)<\/li>/gi;
+        let li;
+        let k = 0;
+        while ((li = liRe.exec(n.content))) {
+          k++;
+          items.push((n.tag === "ol" ? `${k}. ` : "") + li[1].trim());
+        }
+        out += `<span class="t-body${extra}"${keep ? " " + keep : ""}>${items.join("<br>")}</span>`;
+        what.push(`<${n.tag}> → .t-body runs`);
+      } else {
+        const cls = /^h[1-6]$/i.test(n.tag) ? "t-title" : "t-body";
+        out += `<span class="${cls}${extra}"${keep ? " " + keep : ""}>${n.content.trim()}</span>`;
+        what.push(`<${n.tag.toLowerCase()}> → .${cls}`);
+      }
+      prevRow = true;
+      pendingBreak = false;
+      continue;
+    }
+    // any other element: keep verbatim; inline row runs still need separation
+    if (ROW_LIKE.has(n.tag)) {
+      if (prevRow && pendingBreak) out += "<br>";
+      out += n.whole;
+      prevRow = true;
+      pendingBreak = false;
+    } else {
+      out += n.whole;
+      prevRow = false;
+      pendingBreak = false;
+    }
+  }
+  return { html: out, what };
+}
+
+function fixDeck(raw) {
+  const fixes = [];
+  for (const boxClass of ["card", "kpi", "pill", "stat", "cell"]) {
+    const ranges = [];
+    const openRe = new RegExp(`<([a-z][a-z0-9]*)\\b[^>]*\\bclass=(["'])[^"']*\\b${boxClass}\\b[^"']*\\2[^>]*>`, "gi");
+    let m;
+    while ((m = openRe.exec(raw))) {
+      const tag = m[1];
+      const start = m.index + m[0].length;
+      const tagRe = new RegExp(`</?${tag}\\b[^>]*>`, "gi");
+      tagRe.lastIndex = start;
+      let depth = 1;
+      let t;
+      while ((t = tagRe.exec(raw))) {
+        if (t[0][1] === "/") depth--;
+        else depth++;
+        if (depth === 0) break;
+      }
+      const end = t ? t.index : raw.length;
+      const slide = (raw.slice(0, m.index).match(/<section\b/gi) || []).length;
+      ranges.push({ start, end, inner: raw.slice(start, end), slide });
+    }
+    for (let i = ranges.length - 1; i >= 0; i--) {
+      const r = ranges[i];
+      const fixed = fixBoxInner(r.inner);
+      if (fixed.html !== r.inner) {
+        raw = raw.slice(0, r.start) + fixed.html + raw.slice(r.end);
+        fixes.push({ slide: r.slide, boxClass, what: fixed.what });
+      }
+    }
+  }
+  return { html: raw, fixes };
+}
+
 function lintDeck(deckPath, opts = {}) {
   const errors = [];
   const warnings = [];
@@ -269,7 +427,8 @@ function lintDeck(deckPath, opts = {}) {
         if (!rawTag) continue;
         errors.push(
           `slide ${secIndex}: raw <${rawTag[1].toLowerCase()}> inside .${boxClass} — box text must be runs (.t-title/.t-body/.t-cap, <b>, <br>), nothing else in the box (export merge + style; patterns.md → One-box rule). ` +
-            `Replace it: <${rawTag[1].toLowerCase()}>text</${rawTag[1].toLowerCase()}> → <span class="${/^h[1-6]$/.test(rawTag[1].toLowerCase()) ? "t-title" : "t-body"}">text</span>; rows are separated by <br>, not by block tags`,
+            `Run the mechanical fix: lint-deck.cjs ${path.basename(file)} --fix (converts the box blocks into runs and adds the row <br> automatically), or replace by hand: ` +
+            `<${rawTag[1].toLowerCase()}>text</${rawTag[1].toLowerCase()}> → <span class="${/^h[1-6]$/.test(rawTag[1].toLowerCase()) ? "t-title" : "t-body"}">text</span>; rows are separated by <br>, not by block tags`,
         );
         break;
       }
@@ -327,10 +486,26 @@ function lintDeck(deckPath, opts = {}) {
 }
 
 function main() {
-  const args = process.argv.slice(2).filter((a) => !a.startsWith("--"));
+  const argv = process.argv.slice(2);
+  const fix = argv.includes("--fix");
+  const args = argv.filter((a) => !a.startsWith("--"));
   if (!args.length) {
-    console.error("usage: lint-deck.cjs <deck.html>");
+    console.error("usage: lint-deck.cjs <deck.html> [--fix]");
     process.exit(2);
+  }
+  if (fix) {
+    const file = path.resolve(args[0]);
+    const before = fs.readFileSync(file, "utf8");
+    const { html, fixes } = fixDeck(before);
+    if (fixes.length) {
+      fs.writeFileSync(file, html);
+      for (const f of fixes) {
+        console.log(`fix: slide ${f.slide || 1} .${f.boxClass}: ${f.what.length ? f.what.join(", ") : "row <br> added"}`);
+      }
+      console.log(`fix: ${fixes.length} box(es) repaired — review the diff, then lint again`);
+    } else {
+      console.log("fix: nothing to repair (no raw block tags or missing row <br> in boxes)");
+    }
   }
   const r = lintDeck(args[0]);
   if (r.errors.length) process.exit(1);
@@ -346,4 +521,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { lintDeck };
+module.exports = { lintDeck, fixDeck };

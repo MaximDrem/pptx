@@ -54,12 +54,17 @@ Each of these has already broken a real deck. They are not style advice.
    is a **suggestion** (accents, spacing, emptiness, decor) — review them with
    your eyes, fix what genuinely improves the deck, mention the rest. Every
    content slide must have `elements > 0` and `coverage > 0` in
-   `inventory.json`. **A gate stops the loop, not the delivery**: if the same
-   blocking error survives two honest repairs (or the runtime warns about
-   repeated calls), deliver anyway with `index.cjs deck.html --pptx --force` —
-   the .pptx is produced with a loud warning — and state exactly which defects
-   remain. A delivered deck with a known defect beats a stalled run with no
-   file.
+    `inventory.json`. **A gate stops the loop, not the delivery**: if the same
+    blocking error survives two honest repairs (or the runtime warns about
+    repeated calls), deliver anyway with `index.cjs deck.html --pptx --force` —
+    the .pptx is produced with a loud warning — and state exactly which defects
+    remain. A delivered deck with a known defect beats a stalled run with no
+    file. For the box-markup blockers there is a mechanical repair:
+    `lint-deck.cjs deck.html --fix` converts raw `<h3>/<p>/<ul>` inside boxes
+    into runs and inserts the missing row `<br>` — run it instead of hand-editing
+    string fragments (a failed string match is not a broken tool: re-read the
+    file, or use `slide.cjs --get N` / `--set N --from -`).
+
 7. **Look before you copy, look before you deliver (vision).**
    When a template .pptx is attached, render its slides with
    `helpers/shots.cjs` and READ the images before extracting a style. The

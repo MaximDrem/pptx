@@ -80,12 +80,12 @@ function main() {
   assert.ok(/## Background 1 \(cover\)[\s\S]*?template-bg-1\.png/.test(md), "cover art is Background 1");
   assert.ok(md.includes('<img class="logo pos-tl"'), "logo keeps the template's top-left corner");
   assert.ok(md.includes("## Branding lockup"), "the near-white wide lockup becomes branding");
-  assert.ok(!/## Decor[^]*?brand\.png/.test(md), "branding must not be in the decor menu");
+  assert.ok(!/## Element[^]*?brand\.png/.test(md), "branding must not be in the decor menu");
   assert.ok(md.includes("It is NOT decor"), "branding carries the do-not-overlap warning");
   assert.strictEqual(r.branding, 1, "one branding lockup");
   assert.strictEqual(r.decor, 2, "two decors on the same slide are kept (a stack)");
-  assert.ok(/## Decor 1 \(693×693px\)[\s\S]*?slide 2: left 766px, top -224px, 444×444px, rot 205°/.test(md), "decor placement + rotation is 1-based slide 2");
-  assert.ok(md.includes("does NOT repeat decor at identical coordinates"), "decor variety rule is spelled out");
+  assert.ok(/## Element 1 \(693×693px\) — auto-role: decor[\s\S]*?slide 2: left 766px, top -224px, 444×444px, rot 205°/.test(md), "decor placement + rotation is 1-based slide 2");
+  assert.ok(md.includes("The template moves, mirrors, scales and bleeds its art per slide"), "decor variety rule is spelled out");
   assert.ok(md.includes("## Photo 1") && md.includes("decor-img round"), "a square photo gets the circle hint");
   assert.ok(md.includes("## Icon 1"), "icons get their own menu");
   assert.ok(md.includes("## Box styles") && md.includes("rgba(255, 255, 255, 0.15)"), "box variants are listed with slide evidence");
