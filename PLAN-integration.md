@@ -334,6 +334,34 @@ the agent runs):
   hardcoded detectors (design frame: see the root AGENTS.md). No app
   change.
 
+## 16. v67 addition: mode split (create.md / template.md)
+
+work_results/9 evidence: the tools surfaced every fact (bg warnings 0/10,
+unused-asset map, plan-word kickers in the structural read, FIX PATH) and the
+agent still shipped a flat deck reading "no blocking errors → export"; a
+second run fixed everything including backgrounds, got stopped by the
+repetition guard before export and delivered a status text instead of the
+.pptx. An attempted fix — escalating the zero-background warning to a lint
+error — was rejected (a fidelity gate, against the invariant). The structural
+fix: the mode contract must be in front of the agent before it writes, not
+re-derived by a linter after:
+
+- SKILL.md is now the router + common core (non-negotiables, gotchas, plan,
+  writing mechanics, loop, export, self-review, hard bans): §0 routes "from
+  scratch" → `create.md` and "copy this deck" → `template.md`, read BEFORE
+  writing;
+- `create.md`: built-in style choice (ex-§1A), saved profiles, the
+  from-scratch picture rule;
+- `template.md`: the copy contract as a first-class rule ("the result must
+  READ as the same design family — its backgrounds, palette, art, density"),
+  the full ex-§1B workflow, and its own verify step (review --reference,
+  density comparison, decor signature, box variety, template art);
+- new common finish-line rule (§6 + hard bans): a turn that ends without a
+  .pptx is a failed turn — runtime guard mid-loop → export what you have
+  (with --force after two honest attempts) instead of a progress report;
+- §4 shows the template-mode review command WITH --reference (both failed
+  runs forgot the flag and never saw the density comparison).
+
 ## Historical: bootstrap doc (merged 2026-09-25)
 
 The root `desktop-ai-app_integration.md` tutorial was merged here and deleted.

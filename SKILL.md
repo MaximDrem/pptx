@@ -153,14 +153,20 @@ Full helper list, report formats and diagnostics: `reference.md`.
 
 ## Workflow
 
-### 0. Pick the mode
+### 0. Pick the mode — and read its rules file BEFORE writing
 
 | Request | Mode |
 |---|---|
-| "make a presentation about X" | new deck (steps 1A, 2–7) |
-| "make it in the style of this deck" (a .pptx attached) | **vision style copy** (step 1B), then 2–7 |
-| "rework/improve this presentation" (a .pptx attached) | read it (step 1C), then 2–7 |
-| "in the style of <saved>" | profile from `~/.wsc/config/styles/` |
+| "make a presentation about X" | read **`create.md`**, then steps 2–7 |
+| "make it in the style of this deck" (a .pptx attached) | read **`template.md`**, then steps 2–7 |
+| "rework/improve this presentation" (a .pptx attached) | read it (step 1C), then steps 2–7 |
+| "in the style of <saved profile>" | `create.md` (it covers saved profiles) |
+
+The mode file is part of the contract, not optional reading: the template-copy
+failures (flat backgrounds on an image-bg template, branding-only decor) all
+happened while the copy rules sat in a file the agent skimmed past. Read the
+one file for your mode, then continue with the plan (§2), writing (§3) and the
+loop (§4–6).
 
 Before working, ask the user only what really changes the deck: topic/goal,
 audience, approximate length, must-have facts/numbers. Ask at most once, in the
@@ -169,125 +175,6 @@ file, "make a presentation about X"), start without asking. **Format is never a
 question**: a presentation request always ends with a `.pptx` — never ask
 whether to make the pptx, which format, or whether to export. Do not start
 laying out before you understand the goal and the length.
-
-### 1A. Pick a built-in style
-
-**Default: `sber`** — the brand style (white canvas, Sber gradient
-#0098F8 → #21A038 → #F1E813 in accents and chart fills, Inter in place of the
-proprietary SB Sans). Use it unless the content clearly asks for something
-else. Alternatives in `styles/index.json`: `signal-night` (dark brand variant
-for pitch/strategy), `grid-paper` (neutral IKB when the deck is not
-Sber-related), `ink-press` (warm editorial for stories/reports). Pick by
-content type without asking; if the user named a style, use it. Never mix two
-palettes in one deck.
-
-```html
-<style data-presentation-style="sber"></style>
-```
-
-### 1B. Copy the style of an attached deck (with your eyes)
-
-Text parsing alone is NOT enough — it produced decks with flat blue slides and
-a decorative cat stretched as a background. The workflow:
-
-```bash
-# 1) See the template first: per-slide PNGs + a text digest
-... shots.cjs "<attached.pptx>" --out-dir tpl-shots
-
-# 2) Extract tokens + assets AND deploy the key art next to the deck
-#    (--deploy takes the working folder; "." only works with the cd above)
-... style-profile.cjs "<attached.pptx>" --name "Style name" --deploy .
-```
-
-Right after step 2, **verify the deploy landed in YOUR working folder** —
-the helper prints the absolute deploy dir; if it is not the folder you are
-working in, re-run with `--deploy "<your working folder>"`. A quick
-`ls images/` must show template-bg-*.png and template-assets.md before you
-write deck.html.
-
-Then, **in this order**:
-
-1. READ every `tpl-shots/slide-NN.png` (vision). For each slide note:
-   role (cover/section/content/closing), background (flat color? photo?
-   gradient?), where the logo sits, what is decor vs content. This is the
-   ground truth — the parser's roles are hints, your eyes are the verdict.
-   For a text-heavy template also run `read-pptx.cjs <template.pptx>
-   --outline`: the shots digest truncates long texts, and you need the full
-   per-slide content to see what its slides actually carry.
-2. From the shots pick the **background assets**: full-slide, dark or calm
-   images only. A transparent PNG or a small/edge element is DECOR — it never
-   becomes a slide background (the validator errors `decor-as-background`;
-   real incident: the template's cat decor became the final slide's
-   background).
-3. Note the palette by looking: dominant color, accent, whether the deck is
-   dark or light. Compare with the extracted `tokens.css`; if they disagree,
-   trust what you SEE and fix the tokens (bg/ink/accent) by hand.
-4. **Look at the art yourself, then decide** — the copy is recognizable because
-   it reuses the template's own elements, not because a script placed them.
-   `--deploy` copies the art into `images/` and writes
-   `images/template-assets.md` with FACTS: the file, its size, and where each
-   element appears on the template's own slides (slide number, position,
-   rotation). The role words there (`decor`/`photo`/`icon`) are auto-guesses.
-   **Open the image files you consider** (you can view them like any PNG) and
-   answer in your own words:
-   - what is it? (blob/arrow/3D icon/photo of a person/laptop/screenshot/logo…)
-   - content or atmosphere? (a photo the slide is *about* vs an edge accent)
-   - does your slide need it at all?
-   Then look at the template shot of the slide that uses it and place it the
-   same way, adapted to your content. Do not stamp the same element at the same
-   coordinates on every slide — the template moves, mirrors, scales and bleeds
-   its art per slide. Bleeding off an edge is fine (negative offsets); art over
-   text, a squashed aspect or the same spot on 3+ slides show up as suggestions
-   (`decor-under-text`, `stretched-image`, `decor-stamp`) — decide in the
-   render. Technical forms:
-   - `<img class="bg-img" src="images/template-bg-1.png" alt="">` as the FIRST child
-     of **every slide that has a background in the template** — for corporate
-     templates that is usually most content slides too, not only cover and
-     closing (a copy with the background on two slides reads as a different
-     deck; `lint-deck` errors when the template is image-heavy and backgrounds
-     are missing). The deploy map lists which template slides use which
-     background — match by slide type. A token bg is only for flat templates;
-   - the profile already reproduces the template's content boxes: `--c-surface`
-     holds the template's own card fill (usually a translucent white/black,
-     e.g. `rgba(255,255,255,0.15)`), so plain `.card` looks native. The
-     manifest's **Box styles** lists the template's actual box looks (fill,
-     rounding, border, glow, slide numbers); patterns.md → **Box variants**
-     maps each look to its HTML form (`.card` / `.deep` / `.ghost` / `.tint` /
-     `.inverse`; rows/steps/numbers are separate patterns). Use the matching
-     form — the same box on every slide is the monotonous-copy failure;
-   - `<img class="logo" …>` in the corner the manifest prints — corporate
-     templates usually keep it TOP-LEFT, so paste `class="logo pos-tl"` and
-     add `with-logo` to the slide class (it reserves the top band). A
-     **Branding lockup** is a separate section: near-white brand art that goes
-     where the template puts it (usually once, on the cover) — it is NOT
-     decor: never repeat it and never place it over the logo;
-   - a photo is content: prefer a `.media` block inside a pattern (or a
-     circular inset for a square portrait) and keep its aspect (set only
-     `width`); do not squeeze it into a corner;
-   - the **Layout recipes** section lists what the template composes per slide:
-     background + art + box looks + `connectors: N (arrows)` + `table R×C` +
-     title. Match the recipe to the section you are building — a KPI row, a
-     flow, a photo-led slide — instead of putting every section on the same
-     grid. Connectors/arrows become the `.flow`/`.steps` patterns (never a
-     pasted image), a table becomes `.table`, and a photo's crop/opacity fact
-     (when listed) tells you how the original framed it.
-   If `template-assets.md` says the template has no reusable art (a flat
-   token-only style), say so and move on.
-5. Build the deck with `data-presentation-style="profile:<slug>"`. Keep the
-   template's dark/light decision on EVERY slide — do not switch some slides
-   to a flat fill "for variety" (that is how the blue slides happened).
-6. Verify against the reference: put a template shot next to your render of
-   the same kind of slide. If they feel like different decks, fix tokens,
-   backgrounds or the deployed art before delivering. Compare DENSITY too:
-   `shots` prints the template's average filled boxes + pictures per slide,
-   and `review --reference` prints your numbers next to it — a copy at half
-   the reference density reads empty even when every check passes. Close the
-   gap with the template's own means (its boxes, decor placements, `.flow`
-   for its connectors, photos where it has them); empty space is not
-   minimalism. Decor is the template's recurring signature: the branding
-   lockup goes where the template puts it (usually once, the cover), but
-   deployed decor belongs on several slides in varied placements — a copy
-   that used only the branding lost the template's signature (real case).
 
 ### 1C. Rework someone else's .pptx
 
@@ -476,7 +363,8 @@ Markup rules:
   no emoji — never draw your own paths;
 - images — local files referenced relatively (`<img src="images/...">` with
   `alt`), generated ONLY with an image tool from your tool list (e.g.
-  `text2image`/`gigachat_image`) before assembling; template media — copied
+  `text2image`/`gigachat_image`) before assembling (see `create.md` for the
+  from-scratch picture rule); template media — copied
   next to the deck and verified by looking
   at them. **Never paste `data:` URIs into the deck**: the builder inlines
   styles and assets into a temp build copy, so the authored file stays small
@@ -494,6 +382,7 @@ Markup rules:
 
 ```bash
 ... review.cjs deck.html --out-dir deck-check
+# template mode: review.cjs deck.html --out-dir deck-check --reference "<template.pptx>"
 ```
 
 `review.cjs` renders the deck, prints every `slide-NN.png` to look at, lists
@@ -577,11 +466,11 @@ The last gate — look at the EXPORTED deck, not the HTML:
 ```
 
 READ the printed PNGs and answer honestly — first per slide, then the deck as a
-whole. In template mode also read the reference shots of the same slide kind.
-Look at them fresh: after staring at the markup you tend to see what you meant,
-not what rendered (if you have a subagent, hand it the PNG paths for a second
-opinion). This is YOUR judgment; the tools only measure (nothing below is a
-lint gate):
+whole. In template mode this step IS `template.md` step 6 (reference shots side
+by side, density, decor signature). Look at them fresh: after staring at the
+markup you tend to see what you meant, not what rendered (if you have a
+subagent, hand it the PNG paths for a second opinion). This is YOUR judgment;
+the tools only measure (nothing below is a lint gate):
 
 Per slide:
 
@@ -600,38 +489,28 @@ Across the deck:
   are the same grid of boxes, change some to another pattern from `patterns.md`
   (split, flow, kpi-row, timeline, table, quote) or make one of them a picture
   slide. A deck of identical squares is the #1 "generated, not designed" tell;
-- **box variety**: in template mode the manifest's Box styles list several
-  fills — if every card is the same surface, switch some to
-  `.card.deep/.tint/.ghost`; the original template mixes them;
 - **art placement**: read the structural read's `decor:`/`images:` lines and
   judge with your eyes: is the same element at the same coordinates on 3+
   slides (`decor-stamp`)? Is a photo squashed (`stretched-image`)? Does art sit
   on text (`decor-under-text`)? These are signals, not rules — move, mirror,
   scale or bleed the element, swap it, or keep it deliberately (off-slide bleed
-  is stylistically fine). A real copy stamped a blob into one corner of every
-  slide and squashed the template's content photo (1079×1079) into 260×149; the
-  fix is your judgement from the reference shots, not a manifest recipe;
-- **template art**: in template mode, name the deployed element you used on the
-  cover and on a content slide (the structural read's TEMPLATE ASSETS block
-  shows what is where). If `template-decor-*` exists and appears nowhere, place
-  it on the cover/section/closing (bleed it off an edge if it collides). If you
-  reused one decor, its coordinates must not be identical on every slide, and
-  text must stay readable on top of it;
-- **pictures**: if the deck has no photo and the topic allows one, generate 1–3
-  images with the chat image tool (e.g. `gigachat_image`/`text2image`) and use
-  them on the cover or a key content slide — a big picture is what makes a
-  text-heavy deck land. One image = one meaning; never reuse one file twice.
+  is stylistically fine).
 
 If something is off — fix the HTML and repeat steps 4–6. If you cannot view
 images, state it and deliver on `validate: clean` + `inspect.cjs` alone.
 
 Done means: the `.pptx` exists next to `deck.html` (plus `--pdf` only if the
-user asked) and `validate` is clean. Finish the turn with a short summary **in
-Russian** — artifact path(s), slide count, style, and at most two
-things worth a human glance in PowerPoint (numbers, fonts). No questions, no
-"should I export?", no "would you like…": a presentation request is not
-finished until the .pptx is produced. A later "fix slide N" means edit
-`deck.html`, rebuild, validate.
+user asked) and `validate` is clean. **A turn that ends without a .pptx is a
+failed turn**: if the runtime guard stops your next edit mid-loop, do not
+write a progress report — run `index.cjs deck.html --pptx` (with `--force`
+after two honest fix attempts) on what you already have and deliver that with
+a stated list of what remains. A real run fixed everything, got stopped before
+export and left the user with a status text instead of the deck. Finish the
+turn with a short summary **in Russian** — artifact path(s), slide count,
+style, and at most two things worth a human glance in PowerPoint (numbers,
+fonts). No questions, no "should I export?", no "would you like…": a
+presentation request is not finished until the .pptx is produced. A later
+"fix slide N" means edit `deck.html`, rebuild, validate.
 
 ## Hard bans
 
@@ -669,12 +548,17 @@ finished until the .pptx is produced. A later "fix slide N" means edit
   `read-pptx.cjs --extract-media` when the user asks for it;
 - never retry an identical tool call: if a call fails twice, change the
   approach (read the exact lines, rewrite the whole file);
+- **never end the turn without the artifact**: a status report is not a
+  deliverable — if the runtime guard stops your next edit, export what you
+  have (`index.cjs deck.html --pptx`, `--force` after two honest fix
+  attempts) and state what remains;
 - do not ask the user about editor/tool mechanics (ambiguous anchors, failed
   edits, formatting) — read the file and recover yourself: unique anchor or
   full rewrite.
 
 ## Files
 
-`patterns.md` — slide patterns · `charts.md` — charts · `reference.md` —
-helpers/formats/diagnostics · `styles/_base/icons.md` — paste-ready Lucide
-icons · `examples/example-deck.html` — reference deck.
+`create.md` — the from-scratch mode rules · `template.md` — the template-copy
+mode rules · `patterns.md` — slide patterns · `charts.md` — charts ·
+`reference.md` — helpers/formats/diagnostics · `styles/_base/icons.md` —
+paste-ready Lucide icons · `examples/example-deck.html` — reference deck.

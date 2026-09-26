@@ -503,7 +503,7 @@ user). It prints the structural read of every slide
 `inspect.cjs` prints), runs `validate.cjs` on the existing `.pptx` (skipped with
 `--no-validate`), optionally renders reference shots of a template — printing
 the template's and your deck's average density side by side as FACTS (the
-judgment is the agent's against the reference shots, SKILL §1B.6; no
+judgment is the agent's against the reference shots, template.md step 6; no
 threshold — a taste gate in numeric clothing was rejected) — and prints
 the review checklist (style consistency, layout variety, visual anchors, decor,
 template similarity, density, plan-language labels, AI-slop signals). When
