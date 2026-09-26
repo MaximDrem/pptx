@@ -100,68 +100,13 @@ function lintDeck(deckPath, opts = {}) {
     );
   }
 
-  // 0b. Template fidelity — ADVICE, not a gate: the user asked for this
-  //     template's style, and a copy that drops its art stops reading as that
-  //     style. The tools report the gap; whether and where to place the art is
-  //     the agent's judgement (see images/template-assets.md).
+  // 0b. Template fidelity is NOT linted. The reference (Anthropic pptx)
+  // validates schema only; fidelity lives in the workflow — the explicit
+  // mapping of each plan slide onto a template slide and the agent's eyes on
+  // the reference shots. Fidelity warnings here were tried and cut: they
+  // re-derived taste after the fact and the agent shipped anyway.
   const profileMatch = /data-presentation-style=(["'])profile:([^"']+)\1/.exec(raw);
   if (profileMatch) {
-    const stylesDir = process.env.PRESENTATION_STYLES_DIR || path.join(os.homedir(), ".wsc", "config", "styles");
-    const assetsDir = path.join(stylesDir, profileMatch[2].trim(), "assets");
-    let hasAssets = false;
-    try {
-      hasAssets = fs.readdirSync(assetsDir).some((f) => /\.(png|jpe?g|svg|webp)$/i.test(f));
-    } catch {
-      hasAssets = false;
-    }
-    const imgCount = (raw.match(/<img\b/gi) || []).length;
-    if (hasAssets && imgCount === 0) {
-      warnings.push(
-        `template profile «${profileMatch[2].trim()}» has assets but the deck uses none — a copy without the template's background/logo/decor stops reading as its style. ` +
-          `run style-profile.cjs <template.pptx> --name "…" --deploy <this deck's folder> and reuse the snippets from images/template-assets.md`,
-      );
-    }
-    let extracted = [];
-    let imageBgTemplate = 0;
-    let templateSlides = 0;
-    try {
-      const profile = JSON.parse(fs.readFileSync(path.join(stylesDir, profileMatch[2].trim(), "profile.json"), "utf8"));
-      extracted = (profile.media && profile.media.extracted) || [];
-      imageBgTemplate = (profile.density && profile.density.imageBackgrounds) || 0;
-      templateSlides = (profile.source && profile.source.slides) || 0;
-    } catch {
-      extracted = [];
-    }
-    const hasDecor = extracted.some((a) => a.role === "decor");
-    const hasBg = extracted.some((a) => a.role === "background");
-    const usesDecor = /class=(["'])[^"']*\b(?:decor|decor-img)\b/.test(raw);
-    if (hasDecor && !usesDecor) {
-      warnings.push(
-        `template profile «${profileMatch[2].trim()}» has decor assets but the deck uses none — the copy loses the original's recognisable elements. ` +
-          `One deployed decor anywhere sensible already helps, e.g. ` +
-          `<img class="decor-img" style="left:1080px; top:-80px; width:260px" src="images/template-decor-1.png" alt=""> ` +
-          `(exact names in images/template-assets.md; position, size and the choice of decor are yours)`,
-      );
-    }
-    const usesBg = /class=(["'])[^"']*\bbg-img\b/.test(raw) || /background-image\s*:/.test(raw);
-    if (hasBg && !usesBg) {
-      warnings.push(
-        `template profile «${profileMatch[2].trim()}» uses an image background but the deck has none — a flat fill reads as a different deck. ` +
-          `Add <img class="bg-img" src="images/template-bg-1.png" alt=""> to the slides that carry one in the template ` +
-          `(or set background-image yourself); a token background is fine only if the template is flat`,
-      );
-    }
-    if (hasBg && imageBgTemplate >= Math.max(2, templateSlides * 0.4)) {
-      const slideBodies = raw.match(/<section\b[\s\S]*?<\/section>/gi) || [];
-      const withBg = slideBodies.filter((b) => /class=(["'])[^"']*\bbg-img\b/.test(b) || /background-image\s*:/.test(b)).length;
-      const need = Math.ceil(slideBodies.length * 0.5);
-      if (slideBodies.length > 0 && withBg < need) {
-        warnings.push(
-          `template profile «${profileMatch[2].trim()}» uses image backgrounds on its slides, but the deck has one on only ${withBg} of ${slideBodies.length}. ` +
-          `images/template-assets.md says which background belongs to which slide type — put it on the slides that need it (one or two different backgrounds, not a flat fill everywhere)`,
-        );
-      }
-    }
     // The managed style block is replaced wholesale by expand-styles at build
     // time: CSS pasted into it silently disappears from the render.
     const managedCss = /<style\b[^>]*\bdata-presentation-style=(["'])[^"']*\1[^>]*>([\s\S]*?)<\/style>/i.exec(raw);
@@ -172,6 +117,7 @@ function lintDeck(deckPath, opts = {}) {
       );
     }
   }
+
 
   // 1. Offline contract.
   const external = new Set();
@@ -249,12 +195,6 @@ function lintDeck(deckPath, opts = {}) {
     const role = (/(?:^|\s)data-role=(["'])([^"']+)\1/.exec(sec[1]) || [])[2] || "content";
     if (role !== "content") continue;
     const body = sec[2];
-    if (!/class=(["'])[^"']*\bheadline\b/.test(body)) {
-      warnings.push(`slide ${secIndex}: no .headline — content slides use the heading pattern (.kicker + .headline), not a raw <h2>`);
-    }
-    if (!/<div[^>]*class=(["'])[^"']*\bcontent\b/.test(body)) {
-      warnings.push(`slide ${secIndex}: no <div class="content"> — blocks live inside the content wrapper`);
-    }
     if (!PATTERN_BLOCK.test(body)) {
       warnings.push(
         `slide ${secIndex}: no block from patterns.md (card/kpi-row/grid/split/flow/timeline/table/steps/donut/matrix/list) — raw <p>/<ul> is not a pattern; take the markup from patterns.md`,
@@ -277,11 +217,6 @@ function lintDeck(deckPath, opts = {}) {
         );
         break;
       }
-    }
-    if (!/class=(["'])[^"']*\bfooter\b/.test(body)) {
-      warnings.push(
-        `slide ${secIndex}: no .footer — the numbering/anchor is lost (add <div class="footer"><span>Раздел</span><span>${String(secIndex).padStart(2, "0")}</span></div> as the last child of .slide-pad)`,
-      );
     }
   }
   if (!/deck-stage/.test(raw) || !/deck-viewport/.test(raw)) {

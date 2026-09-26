@@ -5,9 +5,9 @@
 //
 // One command for the whole look-and-fix loop: renders the deck, prints the
 // paths of the slide PNGs to LOOK at (only the captures of THIS render — the
-// out-dir is cleaned first), lists probe issues with their severity, prints the
-// structural read, runs the artifact validator (if a .pptx newer than
-// deck.html exists) and prints the review checklist.
+// out-dir is cleaned first), lists probe issues with their severity, prints
+// the static lint (contract errors + advice), runs the artifact validator (if
+// a .pptx newer than deck.html exists) and prints the review checklist.
 //
 // Exit: 0 clean · 4 blocking findings (fix, then re-run) · 2 render could not
 // start · 3 render failed/no report. The loop is: review → look → fix → review
@@ -19,7 +19,6 @@ const os = require("os");
 const path = require("path");
 const { execFileSync } = require("child_process");
 const { renderDeck, BLOCKING_TYPES } = require("./render.cjs");
-const { describeDeck } = require("./lib/describe.cjs");
 
 const VALUE_FLAGS = new Set(["--out-dir", "--reference"]);
 
@@ -32,14 +31,8 @@ const CHECKLIST = [
   "5. Template mode: put the matching reference shot next to your slide (same family?),",
   "   and follow the manifest's Layout recipe — vary decor coordinates and box styles",
   "   (.card/.deep/.tint/.ghost) the way the original does, no identical square wall.",
-  "5b. Density: your slides carry roughly as much as the template's (see the density",
-  "    lines above) — a copy at a third of its boxes/photos reads empty, and empty",
-  "    space is not minimalism.",
   "6. Nothing reads as generic AI slop: no bars under titles, no wall of identical cards,",
   "   no centered body copy, no emoji, no stretched decor used as a background.",
-  "7. No plan-language labels on slides: kickers/captions/footers say what the slide IS",
-  "   ABOUT (a fact, a number, a domain term) — «проблема», «сценарий», «возможности»,",
-  "   «преимущества» are words from your plan, not slide content.",
 ];
 
 function listPngs(dir) {

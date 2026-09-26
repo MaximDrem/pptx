@@ -47,23 +47,16 @@ const bypass = lintDeck(file, { quiet: true });
 delete process.env.GIGATOOL_DECK_LINT;
 assert.ok(bypass.errors.length > 0, "GIGATOOL_DECK_LINT=0 must not disable lint anymore");
 
-// Template fidelity: advisory — the findings fire as WARNINGS (the agent and
-// the user judge the copy; nothing here blocks the build).
+// Template fidelity is NOT linted (v68): the reference skill validates schema
+// only; fidelity lives in the workflow (plan-slide mapping, reference shots,
+// the agent's eyes). Fidelity warnings were tried and cut — they re-derived
+// taste after the fact. The managed-style contract is still linted.
 {
   const stylesDir = fs.mkdtempSync(path.join(os.tmpdir(), "presentation-v3-styles-"));
   const profileDir = path.join(stylesDir, "brand");
   fs.mkdirSync(path.join(profileDir, "assets"), { recursive: true });
-  fs.writeFileSync(path.join(profileDir, "assets", "logo.png"), "not-a-real-png");
-  fs.writeFileSync(path.join(profileDir, "assets", "cat.png"), "not-a-real-png");
   fs.writeFileSync(path.join(profileDir, "assets", "bg.png"), "not-a-real-png");
-  fs.writeFileSync(
-    path.join(profileDir, "profile.json"),
-    JSON.stringify({
-      media: { extracted: [{ name: "logo.png", role: "logo" }, { name: "cat.png", role: "decor" }, { name: "bg.png", role: "background" }] },
-      source: { slides: 10 },
-      density: { imageBackgrounds: 8 },
-    }),
-  );
+  fs.writeFileSync(path.join(profileDir, "profile.json"), JSON.stringify({ media: { extracted: [{ name: "bg.png", role: "background" }] } }));
   const deck = path.join(dir, "template.deck.html");
   fs.writeFileSync(
     deck,
@@ -71,64 +64,20 @@ assert.ok(bypass.errors.length > 0, "GIGATOOL_DECK_LINT=0 must not disable lint 
 <style data-presentation-style="profile:brand"></style>
 <style>.slide { color: red; }</style>
 </head><body><div class="deck-viewport"><div class="deck-stage" id="deck-stage">
-<section class="slide" data-role="content"><div class="slide-pad">Только текст</div></section>
+<section class="slide" data-role="content"><div class="slide-pad">Только текст, ни одного ассета</div></section>
 </div></div></body></html>`,
   );
   process.env.PRESENTATION_STYLES_DIR = stylesDir;
-  const noAssetsUsed = lintDeck(deck, { quiet: true });
-  assert.ok(
-    noAssetsUsed.warnings.join("\n").includes("has assets but the deck uses none"),
-    "profile with assets + text-only deck must warn",
-  );
-  assert.ok(!noAssetsUsed.errors.join("\n").includes("template profile"), "template fidelity must not block (advisory by design)");
-
-  // Background only: the "any image" rule is satisfied, but the decor rule is not.
-  const bgOnly = fs
-    .readFileSync(deck, "utf8")
-    .replace("Только текст", '<img class="bg-img" src="images/template-bg.png" alt="">');
-  fs.writeFileSync(deck, bgOnly);
-  const bgOnlyRes = lintDeck(deck, { quiet: true });
-  assert.ok(
-    bgOnlyRes.warnings.join("\n").includes("has decor assets but the deck uses none"),
-    "background-only copy must warn about the decor",
-  );
-
-  // Decor only: the background is still flat — that is also a weak copy.
-  const decorOnly = bgOnly.replace('<img class="bg-img" src="images/template-bg.png" alt="">', "").replace(
-    "</section>",
-    '<img class="decor-img" style="left:900px; top:-120px; width:380px" src="images/template-decor-1.png" alt=""></section>',
-  );
-  fs.writeFileSync(deck, decorOnly);
-  const decorOnlyRes = lintDeck(deck, { quiet: true });
-  assert.ok(
-    decorOnlyRes.warnings.join("\n").includes("uses an image background but the deck has none"),
-    "decor-only copy must warn about the background",
-  );
-
-  // Backgrounds on cover/closing only: a copy must keep them on most slides.
-  {
-    const four = `<section class="slide" data-role="content"><div class="slide-pad">A</div></section>
-<section class="slide" data-role="content"><div class="slide-pad">B</div></section>
-<section class="slide" data-role="content"><div class="slide-pad">C</div></section>
-<section class="slide" data-role="content"><div class="slide-pad">D</div></section>`;
-    const sparse = fs
-      .readFileSync(deck, "utf8")
-      .replace(/<section class="slide" data-role="content"><div class="slide-pad">[^<]*<\/div><\/section>/g, "")
-      .replace("</div></div></body></html>", '<img class="bg-img" src="images/template-bg.png" alt="">' + four + "</div></div></body></html>");
-    fs.writeFileSync(deck, sparse);
-    const sparseRes = lintDeck(deck, { quiet: true });
-    assert.ok(
-      sparseRes.warnings.join("\n").includes("but the deck has one on only"),
-      "backgrounds missing on most slides must warn",
-    );
-  }
-
-  // Adding one decor clears both warnings.
-  const withDecor = bgOnly.replace("</section>", '<img class="decor-img" style="left:900px; top:-120px; width:380px" src="images/template-decor-1.png" alt=""></section>');
-  fs.writeFileSync(deck, withDecor);
-  const fixed = lintDeck(deck, { quiet: true });
+  const res = lintDeck(deck, { quiet: true });
+  const out = res.warnings.join("\n") + res.errors.join("\n");
+  assert.ok(!out.includes("template profile"), "fidelity gaps must NOT be linted (workflow + eyes own them)");
+  assert.ok(!out.includes("has assets but the deck uses none"), "asset usage is not a lint finding");
+  assert.ok(!out.includes("image background but the deck has none"), "background usage is not a lint finding");
+  // The managed style block contract still fires for profile decks.
+  fs.writeFileSync(deck, fs.readFileSync(deck, "utf8").replace('<style data-presentation-style="profile:brand"></style>', '<style data-presentation-style="profile:brand">.x{color:red}</style>'));
+  const managed = lintDeck(deck, { quiet: true });
   delete process.env.PRESENTATION_STYLES_DIR;
-  assert.ok(!fixed.warnings.join("\n").includes("template profile"), "using bg + decor must clear the template warnings");
+  assert.ok(managed.warnings.join("\n").includes("data-presentation-style"), "CSS pasted into the managed block must still warn");
 }
 
 // Malformed deck: an unclosed <section> must be a clear error, not a render crash.
@@ -159,8 +108,6 @@ assert.ok(bypass.errors.length > 0, "GIGATOOL_DECK_LINT=0 must not disable lint 
   const res = lintDeck(rawDeck, { quiet: true });
   const errs = res.errors.join("\n");
   const warns = res.warnings.join("\n");
-  assert.ok(warns.includes("no .headline"), "raw <h2> must be reported (as advice)");
-  assert.ok(warns.includes('no <div class="content">'), "missing content wrapper must be reported (as advice)");
   assert.ok(warns.includes("no block from patterns.md"), "raw paragraphs must be reported (as advice)");
   assert.ok(errs.includes("external URL on slide 1: http://example.com"), "the URL error must name the slide");
   assert.ok(!errs.includes("support@example.com"), "a plain-text email is allowed offline");
@@ -187,4 +134,4 @@ assert.ok(bypass.errors.length > 0, "GIGATOOL_DECK_LINT=0 must not disable lint 
   assert.ok(!clean.errors.join("\n").includes("raw <"), "runs inside a box stay clean");
 }
 
-console.log("PASS  lint-deck: //host и file: ловятся, bypass удалён, шаблонные ассеты обязательны");
+console.log("PASS  lint-deck: //host и file: ловятся, bypass удалён, фидельность не линтуется (воркфлоу + глаза)");

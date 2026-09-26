@@ -34,7 +34,7 @@ density).
 | Contract guards | `expand-styles` (managed CSS block), `hidden-slide`/`missing-br`/`no-accent`/`sparse-box` probe checks, export blocked on blocking errors (exit 4, no .pptx); taste findings are labelled `suggestion:` and never block, temp-dir decks refused, `slide-count-mismatch` | ✅ |
 | Vision workflow (v3) | `shots.cjs` renders any .pptx to per-slide PNGs (via the app's `--pptx-verify`) + text digest; the SKILL requires looking at template slides before style copying and at own slides before delivery | ✅ (renderer on the work laptop) |
 | Template-copy guards (v3) | `validate`: `decor-as-background` error (transparent/decor media stretched as a background), `visual-scarcity` warning; `style-profile`: contrast guard for extracted ink/bg | ✅ |
-| Self-reflection driver (v3) | `review.cjs`: render → PNG paths → probe → validate → structural read → checklist in one command; template mode adds reference shots | ✅ |
+| Self-reflection driver (v3) | `review.cjs`: render → PNG paths → probe → lint + fix-path → validate → checklist in one command; template mode adds reference shots | ✅ |
 | Structural read (v3, v54) | `inspect.cjs` + `review.cjs` print what the DOM measures and the eye cannot: real background layer, decor + coordinates, blocks, card fills, content band, probe issues, and a factual template-asset usage map (which deployed asset is used on which slide). `probe` inventory gained `layers`/`blocks`/`cls`/`src`/`fill`; no taste verdicts — layout variety, pictures and decor are judged by looking (SKILL §6 checklist) | ✅ |
 | Default style upgrade (v3) | rebuilt tokens for all three styles (accent-2, `--cover-glow`), `cover-art` glow on covers/sections, `timeline` pattern, themed surfaces | ✅ |
 

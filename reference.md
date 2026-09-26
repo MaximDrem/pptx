@@ -167,9 +167,10 @@ cover art is never ranked out. The manifest sections:
 <img class="decor-img" style="left:766px; top:-224px; width:444px" src="images/template-decor-1.png" alt="">
 ```
 
-`lint-deck` fails a profile-styled deck that uses none of the profile assets
-(if the profile has any) — that is what makes a copy recognizable. A
-template-assets.md saying the style is flat/token-only is the only excuse.
+Template fidelity is NOT linted: the reference skill validates schema only,
+and fidelity lives in the workflow — the §2 plan maps every slide onto a
+template slide, the copy is written with the reference shot in view, and the
+agent's eyes compare the render with the reference before delivery.
 
 How to use the profile in a new deck: reference it in the managed style block
 (`profile:<slug>`), use the deployed art as above, then `index.cjs` inlines the
@@ -358,11 +359,7 @@ structure, the eyes decide taste.
 | `decor-under-text` | decor overlaps text | judge in the render: keep it if intentional, otherwise bleed it off the edge or move it |
 | `stretched-image` | rendered aspect differs from the file's by >15% | set only `width` (height auto) or `object-fit: cover`; never width+height on a photo |
 | `hidden-slide` | the slide is `display:none` or zero-sized — the export engine skips it (a real deck lost 8 of 10 slides this way) | hide slides with `.active` only; never `display:none` |
-| `the deck uses none of the template assets` (lint) | the deck copies a style profile that has assets, but no `<img>` uses them | run `style-profile.cjs <pptx> --deploy <deck-dir>` and paste the `images/template-assets.md` snippets (`bg-img`/`logo`/`decor-img`) |
-| `uses an image background but the deck has none` (lint) | a copy left the background flat | add `<img class="bg-img" …>` on the slides that have it in the template |
 | `accent-cards` | 2+ solid accent cards on one slide | keep one; use `.card.tint` for the other highlights |
-| `uses an image background … backgrounds on most slides` (lint) | background copied only to cover/closing while the template paints most slides | add `.bg-img` to every slide that has one in the template (map in `images/template-assets.md`) |
-| `has decor assets but the deck uses none` (lint) | the background was copied but the template decor ignored — the copy loses its recognisable elements | place **any** deployed decor somewhere sensible (`decor-img`); the map in `images/template-assets.md` is a hint — move/resize/swap decor freely |
 | `missing-br` | two text rows in one box are not separated by `<br>` | add `<br>` between the rows — the export is blocked, PowerPoint would show one line |
 | `no-accent` | a content slide has no emphasis accent | highlight the key card/step/number/table row (see patterns.md, "Accent budget") |
 | `sparse-box` | a box taller than 180px is filled with text by less than 38% | shorten the box or add substance (see patterns.md, "Box fill") |
@@ -471,9 +468,7 @@ findings on the template are **baselined out** (both output formats): the
 template is the reference you are copying, not a suspect deck — its off-slide
 bleed and text-over-graphics are the design, and a real run that saw 130 such
 lines started "fixing" the template instead of copying it. shots prints one
-summary line instead. It also prints a factual **density** line (the
-template's average filled boxes + pictures per slide) — match your copy
-against it, see `review.cjs --reference`. Use it to:
+summary line instead. Use it to:
 
 - **look at an attached template before copying its style** — classify slides
   and elements with your eyes; parser roles are hints, your verdict is the
@@ -494,21 +489,18 @@ exits 2.
 One command for the whole loop: renders the deck, prints the paths of every
 `slide-NN.png` to LOOK at (the out-dir is cleaned first, so the list is always
 the current render — a reused dir used to show stale pictures from an older
-deck), lists probe issues, prints the STATIC LINT block (authored-file lint:
-contract errors plus advice) — and, when the lint found anything, a FIX PATH
-line naming the exact recovery (slide.cjs --get/--set or one full rewrite;
-a real run died retrying the string-edit tool and handed the job to the
-user). It prints the structural read of every slide
-(background layer, decor, blocks, fills, issues — the same text
-`inspect.cjs` prints), runs `validate.cjs` on the existing `.pptx` (skipped with
-`--no-validate`), optionally renders reference shots of a template — printing
-the template's and your deck's average density side by side as FACTS (the
-judgment is the agent's against the reference shots, template.md step 6; no
-threshold — a taste gate in numeric clothing was rejected) — and prints
-the review checklist (style consistency, layout variety, visual anchors, decor,
-template similarity, density, plan-language labels, AI-slop signals). When
-fatal errors exist it prints an ACTION line: fix via `slide.cjs --get/--set`
-(or one full rewrite), then re-run.
+deck), lists probe issues (`error:` fatal / `suggestion:` for the eyes),
+prints the STATIC LINT block (contract errors plus advice) — and, when the
+lint found anything, a FIX PATH line naming the exact recovery
+(slide.cjs --get/--set or one full rewrite; a real run died retrying the
+string-edit tool and handed the job to the user). With `--reference` it also
+renders the template's slides and prints their PNG paths (put them next to
+your renders and compare by eye). It runs `validate.cjs` on the existing
+`.pptx` (skipped with `--no-validate`) and prints the review checklist (style
+consistency, visual anchors, template similarity, AI-slop signals). When
+fatal render errors exist it prints an ACTION line: fix via
+`slide.cjs --get/--set` (or one full rewrite), then re-run. Structural facts
+per slide are available on demand via `inspect.cjs deck.html`.
 
 The loop is: `review` → READ the PNGs (vision) → fix `deck.html` → `review`
 again, until `render: clean` AND the eyes agree — two or three honest passes,

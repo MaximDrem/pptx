@@ -89,37 +89,6 @@ function digest(deck, limit) {
   return lines;
 }
 
-// One factual line for the density self-check: what the template's slides
-// actually carry (filled shapes + content pictures, backgrounds excluded).
-// A copy at a third of this density reads empty even when every probe check
-// passes — the agent needs the number to compare against (case: a dense
-// 19-slide template copied into sparse text-card slides).
-function densityLine(deck) {
-  const n = deck.slides.length;
-  if (!n) return null;
-  const roleOf = new Map((deck.media || []).map((m) => [m.name, m.role || "picture"]));
-  let boxes = 0;
-  let pics = 0;
-  for (const s of deck.slides) {
-    const flat = [];
-    const flatten = (els) => {
-      for (const e of els || []) {
-        flat.push(e);
-        if (e.children) flatten(e.children);
-      }
-    };
-    flatten(s.elements);
-    boxes += flat.filter((e) => e.kind === "shape" && e.fill && e.fill.type && e.fill.type !== "none").length;
-    pics += flat.filter((e) => e.kind === "picture" && e.media && roleOf.get(e.media) !== "background").length;
-  }
-  const avg = (x) => Math.round((x / n) * 10) / 10;
-  // A neutral FACT (like thumbnail.py's grid): what the reference carries on
-  // average. The interpretation ("a copy at a third of this reads empty")
-  // lives in SKILL.md prose and the review checklist — not here. A numeric
-  // threshold here would be a taste gate in numeric clothing.
-  return `density: the template averages ${avg(boxes)} filled boxes + ${avg(pics)} pictures per slide (${n} slides)`;
-}
-
 async function main() {
   const argv = process.argv.slice(2);
   const flag = (name) => {
@@ -148,7 +117,6 @@ async function main() {
     console.error("fallback: read-pptx.cjs " + JSON.stringify(abs) + " --extract-media tpl-media");
     console.error("then look at the extracted pictures (backgrounds/logos/decor) before reusing them.");
     if (deck) console.log(digest(deck).join("\n"));
-    if (deck) console.log(densityLine(deck) || "");
     process.exit(2);
   }
 
@@ -212,7 +180,6 @@ async function main() {
     }
     for (const f of pngs) console.log("slide " + f.replace(/\D+/g, "").replace(/^0+(?=\d)/, "") + ": " + path.join(outDir, f));
     if (deck) console.log(digest(deck, pngs.length).join("\n"));
-    if (deck) console.log(densityLine(deck) || "");
     console.log(`shots: ${pngs.length} slide(s) → ${outDir}`);
   });
 }

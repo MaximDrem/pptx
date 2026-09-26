@@ -362,6 +362,47 @@ re-derived by a linter after:
 - §4 shows the template-mode review command WITH --reference (both failed
   runs forgot the flag and never saw the density comparison).
 
+## 17. v68 addition: back to the v41 shape (rollback + vetted lessons)
+
+User verdict: the best runs were on v41 (84c8323); v54–v67 walked in circles
+(review --reference complexity, fidelity lint, mode split). v68 = the v41
+contract shape with the harness lessons re-applied on top, verified against
+the reference skill source (anthropics/skills: their validate.py is pure XSD
+schema + --original baselining; no content/taste checks at all; their
+template workflow's core is an explicit "map each content section onto a
+template slide" step).
+
+Kept from v41: single SKILL.md, the 1B workflow shape, hard-gate loop
+language, the compact markup rules.
+
+Re-applied from the failures (each maps to a real run):
+- rule 0 (Russian language contract — an all-English deck was delivered);
+- slide.cjs + the one-write/two-pass/edit-recovery prose (runs died on
+  string-edit anchors and handed the job to the user);
+- bounded gate: fatal-only blocking + `--force` after two honest repairs
+  (v41's "no deliver anyway" stalled runs);
+- finish-line rule: a turn without a .pptx is a failed turn (a run delivered
+  a status text after the runtime guard stopped it mid-loop);
+- shots baselining of BOTH renderer output formats (the 130-line spray);
+- style-profile --deploy (v41's manual asset copying was its weak spot);
+- **the mapping step (the SOTA insight)**: §2 requires every plan line to name
+  the template slide it copies («2. цифры ← tpl 2 (3 stat-карточки)»), and §3
+  requires template mode to write in batches of 2–3 slides with the mapped
+  reference shot OPEN — the copy is made at the writing moment, not from
+  memory. This replaces fidelity lint as the mechanism: structure, decor and
+  box variety enter the deck at birth, not as after-the-fact warnings.
+
+Cut (v54–v67 complexity, no equivalent in the reference skill): density lines
+and the review density comparison, template-fidelity lint warnings
+(assets/backgrounds/decor unused), headline/footer structure warnings, the
+review structural-read block (inspect.cjs remains the on-demand tool), the
+create.md/template.md mode split. review --reference is back to printing
+reference PNG paths only, as in v41.
+
+Helpers stay on the current app-compatible set (render/probe/validate
+contract with the shipped deck-render.ts); the blocking set invariant is
+untouched.
+
 ## Historical: bootstrap doc (merged 2026-09-25)
 
 The root `desktop-ai-app_integration.md` tutorial was merged here and deleted.
