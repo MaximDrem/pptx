@@ -254,19 +254,30 @@ async function main() {
     record("agent-route: slide.cjs --get/--set чинит фрагмент, lint согласен", ok && repaired, `roundtrip=${ok}, repaired=${repaired}`);
 
     // shots baselining: template findings never reach the agent as errors.
+    // Both renderer formats are covered — the new deck-render one
+    // (`slide N: error: …`) and the OLD --pptx-verify one (`slide N: OUT OF
+    // BOUNDS: …` + the `fix deck.js` summary). A real run on a 34-slide
+    // template got 130 lines of the old format sprayed into its context.
     const { filterTemplateNoise } = require(path.join(SKILL, "helpers", "shots.cjs"));
     const filtered = filterTemplateNoise(
       [
         "verify: rendered 34 slide(s) → /tmp/t",
         "slide 1: error: OUT OF BOUNDS: <div> extends 95px past top edge",
         "slide 12: suggestion: TIGHT GAP: ...",
+        "slide 9: TEXT CLIPPED: «Методолог – напишет методологию» overflows its box by 35px vertically",
+        "slide 12: LOW CONTRAST: «•» is nearly invisible against its background",
+        "slide 20: TEXT OVERLAP: «2.» overlaps «внешние сигналы»",
+        "verify: 130 issue(s) — fix deck.js, re-run it, then verify again",
         "captures: 34 slide(s) → /tmp/t",
         "render: 61 blocking error(s), 4 suggestion(s) — export skipped. Fix deck.html and re-run.",
       ].join("\n"),
     );
     record(
-      "shots: находки шаблона бейзлайнятся (эталон, не подозреваемый)",
-      filtered.suppressed === 2 && /verify: rendered/.test(filtered.text) && !/OUT OF BOUNDS/.test(filtered.text) && !/blocking error/.test(filtered.text),
+      "shots: находки шаблона бейзлайнятся (оба формата, эталон не подозреваемый)",
+      filtered.suppressed === 5 &&
+        /verify: rendered/.test(filtered.text) &&
+        !/OUT OF BOUNDS|TEXT CLIPPED|LOW CONTRAST|TEXT OVERLAP|issue\(s\)/.test(filtered.text) &&
+        !/blocking error/.test(filtered.text),
       `suppressed=${filtered.suppressed}`,
     );
   }

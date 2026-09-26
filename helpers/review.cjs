@@ -32,8 +32,14 @@ const CHECKLIST = [
   "5. Template mode: put the matching reference shot next to your slide (same family?),",
   "   and follow the manifest's Layout recipe — vary decor coordinates and box styles",
   "   (.card/.deep/.tint/.ghost) the way the original does, no identical square wall.",
+  "5b. Density: your slides carry roughly as much as the template's (see the density",
+  "    lines above) — a copy at a third of its boxes/photos reads empty, and empty",
+  "    space is not minimalism.",
   "6. Nothing reads as generic AI slop: no bars under titles, no wall of identical cards,",
   "   no centered body copy, no emoji, no stretched decor used as a background.",
+  "7. No plan-language labels on slides: kickers/captions/footers say what the slide IS",
+  "   ABOUT (a fact, a number, a domain term) — «проблема», «сценарий», «возможности»,",
+  "   «преимущества» are words from your plan, not slide content.",
 ];
 
 function listPngs(dir) {
@@ -136,9 +142,11 @@ async function main() {
   // (offline, missing files, box markup that corrupts the export) — the rest
   // is judgement the agent applies to its own deck.
   console.log("\n=== STATIC LINT ===");
+  let lintCount = 0;
   try {
     const { lintDeck } = require("./lint-deck.cjs");
     const r = lintDeck(deck, { quiet: true });
+    lintCount = r.errors.length + r.warnings.length;
     for (const e of r.errors.slice(0, 6)) console.log("  error: " + e);
     if (r.errors.length > 6) console.log(`  … +${r.errors.length - 6} more error(s)`);
     for (const w of r.warnings.slice(0, 6)) console.log("  warning: " + w);
@@ -146,6 +154,17 @@ async function main() {
     if (!r.errors.length && !r.warnings.length) console.log("  clean");
   } catch (e) {
     console.log("  lint failed: " + (e.message || e));
+  }
+  if (lintCount > 0) {
+    // A real run died exactly here: the model read the warnings, tried the
+    // string-edit tool, hit "Could not find oldString" three times, the
+    // runtime stopped it for the repeated call — and it handed the job to
+    // the user. Print the recovery path AT the point of failure.
+    console.log(
+      `\nFIX PATH: apply these with slide.cjs deck.html --get N → edit the fragment → slide.cjs deck.html --set N --from deck-check/slide-N.html, ` +
+        `or rewrite the WHOLE deck.html in one write call (always works). ` +
+        `The string-edit tool is the wrong instrument on deck markup (its anchors repeat on every slide by design): if it failed once, do NOT retry it with the same anchor and never explain the edit to the user instead of making it.`,
+    );
   }
 
   // Structural read: same facts the eye gets from the PNGs — background layer,
@@ -165,6 +184,23 @@ async function main() {
         encoding: "utf8",
       });
       for (const line of out.split("\n")) if (line.startsWith("slide ")) console.log("  " + line.replace(/^slide \d+: /, ""));
+      // Density as FACTS only (like thumbnail.py's grid): the template's
+      // average and the deck's average side by side. Whether "much lower"
+      // is a defect is the agent's judgment against the reference shots
+      // (SKILL §1B.6 + checklist 5b) — a <60% threshold here was tried and
+      // rejected as a taste gate in numeric clothing.
+      const tplDensity = (out.split("\n").find((l) => /^density: /.test(l)) || "").trim();
+      const inv = Array.isArray(r.inventory) ? r.inventory : [];
+      const m = /averages ([\d.]+) filled boxes \+ ([\d.]+)/.exec(tplDensity);
+      if (m && inv.length) {
+        const per = inv.map((s) =>
+          (s.blocks?.length || 0) + (s.elements || []).filter((e) => e.src && !/\bbg-img\b/.test(String(e.cls || ""))).length,
+        );
+        const deckAvg = per.reduce((a, b) => a + b, 0) / per.length;
+        const tplAvg = Number(m[1]) + Number(m[2]);
+        console.log(`  ${tplDensity}`);
+        console.log(`  density: your deck averages ${Math.round(deckAvg * 10) / 10} visual block(s) per slide vs the template's ${Math.round(tplAvg * 10) / 10}`);
+      }
     } catch (e) {
       console.log("  reference shots unavailable: " + String((e.stdout || e.message || e)).trim().split("\n")[0]);
       console.log("  fallback: read-pptx.cjs <template.pptx> --extract-media tpl-media and look at the pictures");

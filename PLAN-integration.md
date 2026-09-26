@@ -297,6 +297,43 @@ not the font weight. No app change.
 - lint ignores role words (`cover/closing/section/quote`) in the class check
   (false warning on the skeleton).
 
+## 15. v66 addition: template-copy loop fixes (two real case studies)
+
+Case A (dense template, big per-slide text): the copy came out sparse —
+decor unused except the branding lockup, and plan-role words («проблема»,
+«сценарий»…) leaked onto slides as labels. Case B (1-slide copy): the OLD
+`--pptx-verify` output format sprayed 130 probe findings on the TEMPLATE into
+the agent's context; the agent then wrote an all-English deck, ignored the
+deployed assets and died retrying the string-edit tool, handing the job to
+the user. Fixed following the Anthropic pptx skill's own pattern (tools
+report facts; taste and language live in prose + the visual checklist —
+their validate.py checks schema only, and their placeholder check is a grep
+the agent runs):
+
+- `shots.cjs` baselines BOTH renderer output formats out (the new
+  `slide N: error: …` and the old `slide N: OUT OF BOUNDS: …` + the
+  `verify: N issue(s) — fix deck.js…` summary), like `validate.py
+  --original`; and prints a factual density line (average filled boxes +
+  pictures per slide, backgrounds excluded);
+- `review.cjs --reference` prints the template's and the deck's average
+  density side by side — facts only, like thumbnail.py's grid; whether a
+  gap is a defect is the agent's judgment (an initial <60% threshold was
+  implemented and rejected as a taste gate in numeric clothing). After any
+  lint finding review prints a FIX PATH line naming the exact recovery
+  (slide.cjs --get/--set or one full rewrite; a real run died retrying the
+  string-edit tool and handed the job to the user);
+- checklist gains density and plan-language items; SKILL.md prose: the plan
+  is working notes (plan words never label slides), `read-pptx --outline`
+  for text-heavy templates, decor is the template's recurring signature
+  (branding once, decor several slides varied), density comparison step,
+  runtime-stop recovery (one full rewrite), unified folder contract
+  (helper folders in the working folder, /tmp is builder scratch only).
+  Two experimental lint checks (a Russian plan-word stoplist and a
+  no-Cyrillic heuristic) were implemented and then REJECTED as
+  non-SOTA: language/taste belongs in prose and the agent's eyes, not
+  hardcoded detectors (design frame: see the root AGENTS.md). No app
+  change.
+
 ## Historical: bootstrap doc (merged 2026-09-25)
 
 The root `desktop-ai-app_integration.md` tutorial was merged here and deleted.

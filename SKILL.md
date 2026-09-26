@@ -18,7 +18,7 @@ Each of these has already broken a real deck. They are not style advice.
    Your internal reasoning between tool calls may be English — that is the
    platform default (think in English, talk to the user in Russian); do not
    translate it and do not let it leak into the answer. Slides are Russian
-   too. A real run delivered a finished deck with an English summary — that
+   too — a real run delivered an all-English deck to a Russian user. That
    is the failure this rule prevents.
 
 1. **Only `helpers/index.cjs` builds the .pptx.**
@@ -134,8 +134,10 @@ cd "<the chat's working folder>" && ELECTRON_RUN_AS_NODE=1 "$GIGATOOL_NODE" "$HO
 
 Every command runs in the working folder the session starts in — you know it
 from `pwd` at start, and it is where the user expects the files. Write
-`deck.html` and `images/` there; the deck never lives in `/tmp` (drafts,
-shots and extracted media may). Prefix helper calls with
+`deck.html`, `images/`, `tpl-shots/`, `deck-check/` and `deck-media/` there;
+the deck never lives in `/tmp`, and neither do the helper folders the user
+might open — `/tmp` is only the builder's internal scratch, which it cleans
+itself. Prefix helper calls with
 `cd "<working folder>" &&` so a drifted shell cannot send files elsewhere,
 and when a helper prints an absolute folder (deploy dir, artifact paths),
 read it — if it is not your working folder, re-run with an explicit path.
@@ -209,6 +211,9 @@ Then, **in this order**:
    role (cover/section/content/closing), background (flat color? photo?
    gradient?), where the logo sits, what is decor vs content. This is the
    ground truth — the parser's roles are hints, your eyes are the verdict.
+   For a text-heavy template also run `read-pptx.cjs <template.pptx>
+   --outline`: the shots digest truncates long texts, and you need the full
+   per-slide content to see what its slides actually carry.
 2. From the shots pick the **background assets**: full-slide, dark or calm
    images only. A transparent PNG or a small/edge element is DECOR — it never
    becomes a slide background (the validator errors `decor-as-background`;
@@ -273,7 +278,16 @@ Then, **in this order**:
    to a flat fill "for variety" (that is how the blue slides happened).
 6. Verify against the reference: put a template shot next to your render of
    the same kind of slide. If they feel like different decks, fix tokens,
-   backgrounds or the deployed art before delivering.
+   backgrounds or the deployed art before delivering. Compare DENSITY too:
+   `shots` prints the template's average filled boxes + pictures per slide,
+   and `review --reference` prints your numbers next to it — a copy at half
+   the reference density reads empty even when every check passes. Close the
+   gap with the template's own means (its boxes, decor placements, `.flow`
+   for its connectors, photos where it has them); empty space is not
+   minimalism. Decor is the template's recurring signature: the branding
+   lockup goes where the template puts it (usually once, the cover), but
+   deployed decor belongs on several slides in varied placements — a copy
+   that used only the branding lost the template's signature (real case).
 
 ### 1C. Rework someone else's .pptx
 
@@ -299,6 +313,12 @@ Write the plan as a numbered list — one line per slide — BEFORE the HTML:
 `1. cover — …`, `2. kpi-row — …`, `3. split + photo — …`. The plan fixes the
 slide count (a "10 slides" request with 8 lines is already a shortfall) and the
 pattern per slide, so the deck does not collapse into one repeated grid.
+
+The plan is working notes, never slide content. Plan-role words («проблема»,
+«возможности», «преимущества», «сценарий», «презентация») must not appear as
+kickers, captions or footers — a real copy carried them as the only labels.
+Every label on a slide says what the slide is ABOUT: a fact, a number, a
+domain term — not the slide's place in your plan.
 
 ### 3. Write deck.html
 
@@ -358,8 +378,12 @@ replaces the Nth `<section>` exactly (no matching at all). Rules:
 - a failed edit means the change is NOT in the file — never re-run the pipeline
   as if it landed;
 - **the same error twice means the fix missed the cause**: do not re-run the
-  same command (weak runtimes stop the turn for repeated tool calls). Open the
-  slide (`slide.cjs --get N`), change the offending element, and re-run once.
+   same command (weak runtimes stop the turn for repeated tool calls). Open the
+   slide (`slide.cjs --get N`), change the offending element, and re-run once.
+   If the runtime has already stopped you for a repeated failed edit call, the
+   string-edit tool is finished for this task: rewrite the complete `deck.html`
+   in ONE write call (or `slide.cjs --get N` → edit → `--set N`) — and never
+   switch to describing the edit to the user instead of making it;
   For `LOW-CONTRAST` change the COLOR or the backdrop — `var(--c-ink)` for
   body, `.card.deep/.card.inverse` on light slides — **not** the font weight;
   for `raw <p> inside .card` replace `<p>x</p>` with

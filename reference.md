@@ -1,8 +1,9 @@
 # reference.md — helpers, formats, diagnostics
 
 All commands run from the agent environment **in the user's working folder**
-(the chat workspace): the deck and the .pptx must live there, temp is only for
-drafts and extracted media. Common template:
+(the chat workspace): the deck, the .pptx and the helper folders the user might
+open (`images/`, `tpl-shots/`, `deck-check/`, `deck-media/`) live there;
+`/tmp` is only the builder's internal scratch. Common template:
 
 ```bash
 ELECTRON_RUN_AS_NODE=1 "$GIGATOOL_NODE" "$HOME/.wsc/config/skills/presentation/helpers/<helper>.cjs" <args>
@@ -465,7 +466,14 @@ charts are snippets from `charts.md`. No libraries in the deck.
 
 Renders every slide of ANY .pptx to `slide-NN.png` via the app's production
 preview renderer (`--pptx-verify`) and prints the paths plus a one-line text
-digest per slide (title + background source). Use it to:
+digest per slide (title + background source). The renderer's own layout
+findings on the template are **baselined out** (both output formats): the
+template is the reference you are copying, not a suspect deck — its off-slide
+bleed and text-over-graphics are the design, and a real run that saw 130 such
+lines started "fixing" the template instead of copying it. shots prints one
+summary line instead. It also prints a factual **density** line (the
+template's average filled boxes + pictures per slide) — match your copy
+against it, see `review.cjs --reference`. Use it to:
 
 - **look at an attached template before copying its style** — classify slides
   and elements with your eyes; parser roles are hints, your verdict is the
@@ -487,13 +495,20 @@ One command for the whole loop: renders the deck, prints the paths of every
 `slide-NN.png` to LOOK at (the out-dir is cleaned first, so the list is always
 the current render — a reused dir used to show stale pictures from an older
 deck), lists probe issues, prints the STATIC LINT block (authored-file lint:
-contract errors plus advice) and the structural read of every slide
+contract errors plus advice) — and, when the lint found anything, a FIX PATH
+line naming the exact recovery (slide.cjs --get/--set or one full rewrite;
+a real run died retrying the string-edit tool and handed the job to the
+user). It prints the structural read of every slide
 (background layer, decor, blocks, fills, issues — the same text
 `inspect.cjs` prints), runs `validate.cjs` on the existing `.pptx` (skipped with
-`--no-validate`), optionally renders reference shots of a template, and prints
+`--no-validate`), optionally renders reference shots of a template — printing
+the template's and your deck's average density side by side as FACTS (the
+judgment is the agent's against the reference shots, SKILL §1B.6; no
+threshold — a taste gate in numeric clothing was rejected) — and prints
 the review checklist (style consistency, layout variety, visual anchors, decor,
-template similarity, AI-slop signals). When fatal errors exist it prints an
-ACTION line: fix via `slide.cjs --get/--set` (or one full rewrite), then re-run.
+template similarity, density, plan-language labels, AI-slop signals). When
+fatal errors exist it prints an ACTION line: fix via `slide.cjs --get/--set`
+(or one full rewrite), then re-run.
 
 The loop is: `review` → READ the PNGs (vision) → fix `deck.html` → `review`
 again, until `render: clean` AND the eyes agree — two or three honest passes,

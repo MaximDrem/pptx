@@ -89,6 +89,37 @@ function digest(deck, limit) {
   return lines;
 }
 
+// One factual line for the density self-check: what the template's slides
+// actually carry (filled shapes + content pictures, backgrounds excluded).
+// A copy at a third of this density reads empty even when every probe check
+// passes — the agent needs the number to compare against (case: a dense
+// 19-slide template copied into sparse text-card slides).
+function densityLine(deck) {
+  const n = deck.slides.length;
+  if (!n) return null;
+  const roleOf = new Map((deck.media || []).map((m) => [m.name, m.role || "picture"]));
+  let boxes = 0;
+  let pics = 0;
+  for (const s of deck.slides) {
+    const flat = [];
+    const flatten = (els) => {
+      for (const e of els || []) {
+        flat.push(e);
+        if (e.children) flatten(e.children);
+      }
+    };
+    flatten(s.elements);
+    boxes += flat.filter((e) => e.kind === "shape" && e.fill && e.fill.type && e.fill.type !== "none").length;
+    pics += flat.filter((e) => e.kind === "picture" && e.media && roleOf.get(e.media) !== "background").length;
+  }
+  const avg = (x) => Math.round((x / n) * 10) / 10;
+  // A neutral FACT (like thumbnail.py's grid): what the reference carries on
+  // average. The interpretation ("a copy at a third of this reads empty")
+  // lives in SKILL.md prose and the review checklist — not here. A numeric
+  // threshold here would be a taste gate in numeric clothing.
+  return `density: the template averages ${avg(boxes)} filled boxes + ${avg(pics)} pictures per slide (${n} slides)`;
+}
+
 async function main() {
   const argv = process.argv.slice(2);
   const flag = (name) => {
@@ -117,6 +148,7 @@ async function main() {
     console.error("fallback: read-pptx.cjs " + JSON.stringify(abs) + " --extract-media tpl-media");
     console.error("then look at the extracted pictures (backgrounds/logos/decor) before reusing them.");
     if (deck) console.log(digest(deck).join("\n"));
+    if (deck) console.log(densityLine(deck) || "");
     process.exit(2);
   }
 
@@ -180,12 +212,21 @@ async function main() {
     }
     for (const f of pngs) console.log("slide " + f.replace(/\D+/g, "").replace(/^0+(?=\d)/, "") + ": " + path.join(outDir, f));
     if (deck) console.log(digest(deck, pngs.length).join("\n"));
+    if (deck) console.log(densityLine(deck) || "");
     console.log(`shots: ${pngs.length} slide(s) → ${outDir}`);
   });
 }
 
 // Drop per-slide probe findings and export-gate talk from a template verify
 // run; keep render facts. Exported for tests.
+//
+// Two output formats reach this filter: the new deck-render one
+// (`slide N: error: TEXT CLIPPED: …`) and the OLD `--pptx-verify` one, which
+// prints findings without a severity word (`slide N: OUT OF BOUNDS: …` plus a
+// `verify: N issue(s) — fix deck.js…` summary). A real run on a 34-slide
+// template sprayed 130 such lines into the agent's context and set it
+// "fixing" the reference it was supposed to copy — both formats are noise
+// here and must be baselined out.
 function filterTemplateNoise(buffer) {
   const lines = buffer.split("\n");
   const kept = [];
@@ -194,6 +235,16 @@ function filterTemplateNoise(buffer) {
     const t = line.trim();
     if (/^slide \d+: (error|suggestion|warning): /i.test(t)) {
       suppressed++;
+      continue;
+    }
+    // Old --pptx-verify format: `slide N: OUT OF BOUNDS: …` (an UPPERCASE
+    // label directly after the slide number — PNG paths start with `/`,
+    // digest titles with `«`, so neither matches).
+    if (/^slide \d+: [A-Z][A-Z0-9 '&/()°%-]*: /.test(t)) {
+      suppressed++;
+      continue;
+    }
+    if (/^verify: \d+ issue\(s\)/i.test(t)) {
       continue;
     }
     if (/^render: \d+ blocking error/i.test(t) || /^render: clean/i.test(t) || /^deck: FONT NOT LOADED/i.test(t)) {
