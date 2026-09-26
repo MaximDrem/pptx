@@ -403,6 +403,40 @@ Helpers stay on the current app-compatible set (render/probe/validate
 contract with the shipped deck-render.ts); the blocking set invariant is
 untouched.
 
+## 18. v69 addition: case-10 fixes (invented asset paths, missing-files loop)
+
+work_results/10 (v68 in the app): shots+style-profile ran clean, then the
+agent wrote deck.html inventing `images/template-assets/logo.png` /
+`…/decor.png` — a folder that never existed; the real deploy names
+(`template-logo.png`, `template-decor-N.png`) lived only inside
+template-assets.md, which the agent never opened. review's MISSING FILES
+preflight fired (as designed) but advised "redeploy INTO the deck's folder" —
+a no-op, the files were already there — and listed the same decor path 9
+times. The agent redeployed, got the same error, ran `ls`, fixed the logo,
+then string-edited the 9 identical decor lines one at a time → "Found
+multiple matches" ×3 → runtime guard killed the turn → Russian status report
+instead of a .pptx (the run-9 hand-off anti-pattern again).
+
+Fixes (facts at the point of need, no new gates):
+- style-profile --deploy now prints the EXACT deployed file names inline
+  (`deploy: EXACT file names for src= (never invent others): images/template-bg-1.png, …`)
+  so the names do not require opening template-assets.md;
+- review MISSING FILES: dedupes repeats (`path (×9)`), lists the files that
+  DO exist under the deck's images/, and splits the advice by cause — files
+  present → "fix the src paths to these EXACT names, redeploying changes
+  nothing"; images/ absent → deploy command. Every missing-files block now
+  also carries the loop-breaker: fix a repeated path in all slides at once
+  (one full rewrite or `sed -i 's|old|new|g'`), never one string-edit at a
+  time.
+
+Same run, app-side (unfixable from the skill): the template renders white
+slides in the app's --pptx-verify preview while PowerPoint shows it fine.
+template_src.pptx anatomy: 15/19 slides use `svgBlip` (PNG fallback in
+a:blip + SVG in the ext), several backgrounds are inherited from layouts
+(slideLayout19). The preview renderer chokes on one/both — the fix belongs
+to the app's pptx preview code (not in this repo; needs the app source +
+rebuild).
+
 ## Historical: bootstrap doc (merged 2026-09-25)
 
 The root `desktop-ai-app_integration.md` tutorial was merged here and deleted.

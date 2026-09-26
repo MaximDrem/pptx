@@ -741,7 +741,7 @@ function deployAssets(assetsDir, written, deckDir, deck, colors) {
     "",
   );
   fs.writeFileSync(path.join(images, "template-assets.md"), lines.join("\n"));
-  return { bg: bgs.length > 0, backgrounds: bgs.length, logo: !!logo, decor: decors.length, branding: brandings.length, photos: photos.length, icons: icons.length, dir: images };
+  return { bg: bgs.length > 0, backgrounds: bgs.length, logo: !!logo, decor: decors.length, branding: brandings.length, photos: photos.length, icons: icons.length, dir: images, names: [...deployedName.values()] };
 }
 
 function tokensCss(p, slug) {
@@ -899,6 +899,12 @@ async function main() {
     console.log(`deploy: bg=${r.backgrounds} logo=${r.logo ? "yes" : "no"} decor=${r.decor} → ${r.dir}`);
     console.log(`deploy dir (absolute): ${r.dir} — write deck.html in THIS folder, next to its images/`);
     console.log("deploy: verify with ls of that images/ — if your deck.html lives in another folder, re-run with --deploy <that folder>");
+    // Print the real file names: a real run invented images/template-assets/logo.png
+    // (a folder that never existed) instead of reading template-assets.md, then
+    // died in the missing-files loop. Names here, snippets+placement in the md.
+    if (r.names && r.names.length) {
+      console.log(`deploy: EXACT file names for src= (never invent others): ${r.names.map((n) => "images/" + n).join(", ")}`);
+    }
     console.log("deploy: paste the snippets from images/template-assets.md (bg-img / logo / decor-img); the deck MUST use at least one of them");
   }
   console.log("use: paste tokens.css before styles/_base.css; read profile.json for principles and evidence");

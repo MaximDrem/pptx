@@ -75,10 +75,28 @@ async function main() {
     }
     if (missing.length) {
       console.error("=== MISSING FILES (fix these paths first) ===");
-      for (const m of missing) console.error("  " + m);
+      const counts = new Map();
+      for (const m of missing) counts.set(m, (counts.get(m) || 0) + 1);
+      for (const [m, c] of counts) console.error("  " + m + (c > 1 ? ` (×${c})` : ""));
       const deckDir = path.dirname(path.resolve(deck));
-      console.error(`the deck is ${path.resolve(deck)} — its files must exist under ${deckDir}/images/`);
-      console.error(`if the assets are elsewhere, redeploy them INTO the deck's folder: style-profile.cjs <template.pptx> --name "…" --deploy "${deckDir}"`);
+      // A real run redeployed on this message (a no-op — the files were already
+      // there under DIFFERENT names), then died string-editing 9 identical
+      // lines one by one. State what exists and how to edit, not just "redeploy".
+      let present = [];
+      try {
+        present = fs.readdirSync(path.join(deckDir, "images")).filter((f) => !/\.md$/i.test(f));
+      } catch {}
+      if (present.length) {
+        console.error(`files that DO exist in ${deckDir}/images: ${present.slice(0, 14).join(", ")}${present.length > 14 ? ` … (+${present.length - 14} more)` : ""}`);
+        console.error("the assets are already there — fix the src paths in deck.html to these EXACT names (snippets with placement: images/template-assets.md). Redeploying changes nothing.");
+      } else {
+        console.error(`no files under ${deckDir}/images yet — deploy the template assets INTO the deck's folder: style-profile.cjs <template.pptx> --name "…" --deploy "${deckDir}"`);
+      }
+      console.error(
+        "a wrong path repeated on many slides is fixed in ALL of them at once: rewrite deck.html in ONE write call " +
+          "or sed -i 's|old/path|new/path|g' deck.html — do NOT string-edit one occurrence at a time " +
+          "(the anchors repeat by design, the edit tool refuses, and the runtime stops the run for repeated calls)",
+      );
       console.error("do not move the deck to the files, do not copy folders to temp — the deck stays where it is");
       process.exit(1);
     }
